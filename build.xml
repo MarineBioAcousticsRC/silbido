@@ -1,0 +1,38 @@
+<project name="silbido" default="build" basedir=".">
+    <description>
+        simple example build file
+    </description>
+
+  <!-- set global properties for this build -->
+  <property name="build" location="build"/>
+  <property name="dist"  location="dist"/>
+
+  <target name="init">
+    <!-- Create the time stamp -->
+    <tstamp/>
+    <!-- Create the build directory structure used by compile -->
+    <mkdir dir="${build}"/>
+  </target>
+
+  <target name="build" depends="buildJar"
+        description="compile the source " >
+    <!-- Compile the java code from ${src} into ${build} -->
+  </target>
+  
+  <target name="buildJar" depends="init">
+     <ant antfile="build.xml" dir="whistle" inheritAll="false"/>
+  </target>
+
+  <target name="dist" depends="build"
+        description="generate the distribution" >
+    <!-- Create the distribution directory -->
+
+  </target>
+
+  <target name="clean"
+        description="clean up" >
+    <!-- Delete the ${build} and ${dist} directory trees -->
+    <delete dir="${build}"/>
+    <delete dir="${dist}"/>
+  </target>
+</project>
