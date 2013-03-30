@@ -36,4 +36,8 @@ thr.broadband = .01;
 
 % When extracting tonals from a subgraph, use up to thr.disambiguate_s
 % when computing the local polynomial fit.
-thr.disambiguate_s = .3;  
+thr.disambiguate_s = .3;
+
+thr.advance_ms = 2;
+thr.length_ms = 8;
+thr.blocklen_s = 3;        % Data processed in N s blocks

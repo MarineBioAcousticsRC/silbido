@@ -1,8 +1,16 @@
-function [AxisH ImageH] = dtPlotSpecgram(File, Start_s, Stop_s, varargin)
+function [AxisH, ImageH, ColorbarH] = dtPlotSpecgram(File, Start_s, Stop_s, varargin)
 % dtPlotSpecgram(File, Start_s, Stop_s, OptionalArgs)
 % Plot spectrogram for specified file between start and stop time in s.
 %
 % Optional arguments
+%   'Axis', AxisHandle - Plot on specified axis.  Otherwise use the 
+%        current axis (e.g. default Matlab plotting behavior)
+%   'AxisColor', Color - Axis and labels in specified color, e.g. 'c'
+%       (cyan)%   'BlockSize_s', N - process in blocks of N seconds (default 3 s)
+%   'Brightness_dB', N_dB - Brightness of spectrogram energy, 
+%        N dB additive offset.  Default 10
+%   'Contrast_Pct', N - Percentage scaling of spectrogram energy.
+%       Default 200.
 %   'Framing', [Advance_ms, Length_ms] - frame advance and length in ms
 %       Defaults to 1 and 2 ms respectively
 %   'Threshold', N_dB - Threshold in dB, only applicable when
@@ -10,8 +18,16 @@ function [AxisH ImageH] = dtPlotSpecgram(File, Start_s, Stop_s, varargin)
 %   'Click_dB', N_dB - Threshold in dB for clicks, a certain percentage
 %       of the bins must exceed this.  This is used for excluding clicks
 %       from the noise floor computation.
-%   'Noise', String - See dtSpectrogramNoiseComp for valid noise
-%        compensation methods.  (default 'none')
+%   'Noise', String|cell array - 
+%        String - noise estimation method (default 'none')
+%        Cell Array - {NoiseMethod, NoiseMethodArguments...}
+%        See dtSpectrogramNoiseComp for details.
+%   'ParameterSet', String or struct
+%       Default set of parameters.  May either be a string
+%       which is passed to dtThresh or a parameter structure
+%       that has been loaded from dtThresh and possibly modified.
+%       This argument is processed before any other argument, and other
+%       arguments may override these values.
 %   'Range' [lowHz highHz]
 %   'Render', String - How image should be rendered
 %       'grey' - grey scale image.  Note that this does not literally
@@ -20,56 +36,55 @@ function [AxisH ImageH] = dtPlotSpecgram(File, Start_s, Stop_s, varargin)
 %                spectral power.
 %       'binary' - index 0 below threshold, 1 above
 %       'floor' - index 0 below threshold, power above
-%   'AxisColor', Color - Axis and labels in specified color, e.g. 'c'
-%       (cyan)
 %   'TransferFn', true|false - enable transfer function if available
+%
+% Returns:
+% AxisH - axis handle to which plots were made
+% ImageH - A set of image handles into which the spectrogram was
+%   partitioned.  This prevents us from requiring large pieces of
+%   contiguous memory
+% ColorbarH - handle to the colorbar associated with the spectrogram
 
 
 error(nargchk(3,Inf,nargin));  % check arguments
 
 % defaults
-Advance_ms = 1;
-Length_ms = 2;
+AxisH = [];
 AxisColor = [];
-NoiseComp = 'none';
+NoiseComp = {'none'};
 Render = 'grey';
-Range_Hz = [5000 50000];
 bright_dB = 10;
-contrast_dB = 200;
+contrast_Pct = 200;
 TransferFn = false;
-% Borrowed these thresholds from dtTonalsTracking
-% Settable Thresholds --------------------------------------------------
-thr.whistle_dB = 10;        % Assuming whistles are normally above
-                           % 10dB energy (SNR criterion)
+RemoveTransients = false;
 
-thr.click_dB = 10;         % SNR criterion for clicks
+thr = dtParseParameterSet(varargin{:});  % retrieve parameters
+block_len_s = thr.blocklen_s;        % process how much at a time
 
-% Whistles whose duration is shorter than threshold will be discarded. 
-thr.minlen_ms = 400;       
-
-% Maximum gap in energy to bridge when looking for a tonal
-thr.maxgap_ms = 30;
-% Maximum difference in frequency to bridge when looking for a tonal
-thr.maxgap_Hz = 600; 
-
-
-% Frames containing broadband signals will not be used in
-% any means estimates.
-% If more than broadand% of the bins exceed the threshold,
-% we consider the frame a click.  
-thr.broadband = .05;
-
-%-------------------------------------------------------------------------
 
 k = 1;
 while k <= length(varargin)
     switch varargin{k}
+        case 'Axis'
+            AxisH = varargin{k+1}; k=k+2;
+            if ~ ishandle(AxisH)
+                error('Axis argument requires valid axis handle')
+            end
+        case 'Brightness_dB'
+            bright_dB = varargin{k+1}; k=k+2;
+        case 'Contrast_Pct'
+            contrast_Pct = varargin{k+1}; k=k+2;
+        case 'BlockSize_s'
+            block_len_s = varargin{k+1}; k=k+2;
+            if ~isscalar(block_len_s) || ~isnumeric(block_len_s)
+                error('BlockSize must be a scalar value')
+            end
         case 'Framing'
             if length(varargin{k+1}) ~= 2
                 error('%s must be [Advance_ms, Length_ms]', varargin{k});
             else
-                Advance_ms = varargin{k+1}(1);
-                Length_ms = varargin{k+1}(2);
+                thr.advance_ms = varargin{k+1}(1);
+                thr.length_ms = varargin{k+1}(2);
             end
             k=k+2;
         case 'Range'
@@ -78,15 +93,24 @@ while k <= length(varargin)
                     || diff(Range_Hz) <= 0;
                 error('%s arg must be [LowHz, HighHz]', varargin{k});
             end
+            thr.low_cutoff_Hz = Range_Hz(1);
+            thr.high_cutoff_Hz = Range_Hz(2);
             k=k+2;
         case 'Render'
             Render = varargin{k+1}; k=k+2;
+        case 'RemoveTransients'
+            RemoveTransients = varargin{k+1}; k=k+2;
         case 'Threshold'
             thr.whistle_dB = varargin{k+1}; k=k+2;
         case 'Click_dB'
             thr.click_dB = varargin{k+1}; k=k+2;
         case 'Noise'
             NoiseComp = varargin{k+1}; k=k+2;
+            if ~iscell(NoiseComp)
+                NoiseComp = {NoiseComp};
+            end
+        case 'ParameterSet'
+            k=k+2;  % processed earlier            
         case 'AxisColor'
             AxisColor =  varargin{k+1}; k=k+2;
             
@@ -100,7 +124,7 @@ while k <= length(varargin)
             catch
                 errstr = sprintf('Bad option in %d''optional argument', k);
             end
-            error(sprintf('Detector:%s', errstr));
+            error('Detector:%s', errstr);
     end
 end
 
@@ -110,27 +134,30 @@ handle = fopen(File, 'rb', 'l');
 % Select channel as per Triton
 channel = channelmap(header, File);
 
+Stop_s = min(Stop_s, header.Chunks{header.dataChunk}.nSamples/header.fs);
+if (Start_s >= Stop_s)
+    error('Stop_s should be greater then Start');
+end
+
 Nyquist = header.fs / 2;
-if Range_Hz(2) > Nyquist
-    Range_Hz(2) = Nyquist;
+if thr.high_cutoff_Hz > Nyquist
+    thr.high_cutoff_Hz = Nyquist;
 end
 
 % Frame length and advance in samples
-Length_s = Length_ms / 1000;
+Length_s = thr.length_ms / 1000;
 Length_samples = round(header.fs * Length_s);
-Advance_s = Advance_ms / 1000;
+Advance_s = thr.advance_ms / 1000;
 Advance_samples = round(header.fs * Advance_s);
-window = hamming(Length_samples);
 bin_Hz = 1 / Length_s;
 
-Overlap_samples = Length_samples - Advance_samples;
-
-block_len_s = 3;        % process how much at a time
-
 Nyquist_bin = floor(Length_samples/2);
+
+% If low cutoff > high cutoff, set to 0
+if thr.high_cutoff_Hz < thr.low_cutoff_Hz
+    thr.low_cutoff_Hz = 0;
+end
 % Determine which bins to use and build frequency axis
-thr.low_cutoff_Hz = Range_Hz(1);
-thr.high_cutoff_Hz = Range_Hz(2);
 thr.high_cutoff_bins = min(ceil(thr.high_cutoff_Hz/bin_Hz)+1, Nyquist_bin);
 thr.low_cutoff_bins = ceil(thr.low_cutoff_Hz / bin_Hz)+1;
 
@@ -154,38 +181,40 @@ end
 shift_samples = floor(header.fs / thr.high_cutoff_Hz);
 shift_samples_s = shift_samples / header.fs;
 
-block_pad_s = 1 / thr.high_cutoff_Hz;
-block_padded_s = block_len_s + 2 * block_pad_s;
-Stop_s = Stop_s - block_pad_s;
+% Determine what padding is needed.
+% padding will be added to each side of the current
+% audio data block and removed after the spectrogram
+% is computed.
+[block_pad_s, block_pad_frames] = ...
+    dtSpectrogramNoisePad(Length_s, Advance_s, NoiseComp{:});
 
-if Start_s - block_pad_s >= 0
-    Start_s = Start_s - block_pad_s;
-end
+% Pad stopping point or set to end of file
+Stop_s = min(Stop_s + block_pad_s, ...
+    header.Chunks{header.dataChunk}.nSamples/header.fs);
+
 blkstart_s = Start_s;
 
 
 done = false;
 hidx = 1;
+
+if isempty(AxisH)
+    AxisH = gca;
+end
+
 while ~ done
-    blkstop_s = min(blkstart_s + block_padded_s, Stop_s);
-    % Read in block and compute spectrogram
-    Signal = ioReadWav(handle, header, blkstart_s, blkstop_s, ...
-        'Units', 's', 'Channels', channel);
     
-   % perform spectral analaysis 
-   [snr_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
-       Length_samples, Advance_samples, shift_samples, ...
-       range_bins, thr.broadband * range_binsN, ...
-       thr.click_dB, NoiseComp);
-   
-   if ~ isempty(xfr_offset)
-       % adjust for transfer function
-       snr_dB = snr_dB - xfr_offset(:, ones(size(snr_dB, 2), 1));
-   end
-   % relative to file rather than block
-   Indices.timeidx = Indices.timeidx + blkstart_s;  
-   
-   switch Render
+    % Read in the block and compute spectra
+    [Signal, snr_dB, Indices, dft, clickP] = ...
+        dtProcessBlock(handle, header, channel, ...
+        blkstart_s, block_len_s, [Length_samples, Advance_samples], ...
+        'Pad', block_pad_s, 'Range', range_bins, ...
+        'Shift', shift_samples, ...
+        'ClickP', [thr.broadband * range_binsN, thr.click_dB], ...
+        'RemoveTransients', RemoveTransients, ...
+        'Noise', NoiseComp);
+
+    switch Render
        case {'grey', 'gray'}
            % do nothing
        case 'binary'
@@ -195,17 +224,24 @@ while ~ done
            snr_dB(snr_dB < thr.whistle_dB) = 0;   % Threshold image
        otherwise
            error('Bad render type %s', Render);
-   end
+    end
     
-    ImageH(hidx) = image(Indices.timeidx, fkHz, snr_dB);  % plot the block
-    colorData = (contrast_dB/100) .* snr_dB + bright_dB;
+%     % Trim to last complete frame
+%     if Indices.FrameLastComplete < length(Indices.timeidx)
+%         Indices.timeidx(FrameLastComplete+1:end) = [];
+%         snr_dB(:,Indices.FrameLastComplete+1:end) = [];
+%     end
+    % plot the block
+    ImageH(hidx) = image(Indices.timeidx, fkHz, snr_dB, 'Parent', AxisH);  
+    colorData = (contrast_Pct/100) .* snr_dB + bright_dB;
     set(ImageH(hidx), 'CData', colorData);
     
     % Store the snr, brightness and contrast in UserData structure
     % associated with the image
     pwr_brt_cont.snr_dB = snr_dB;
     pwr_brt_cont.bright_dB = bright_dB;
-    pwr_brt_cont.contrast_dB = contrast_dB;
+    pwr_brt_cont.contrast_Pct = contrast_Pct;
+    pwr_brt_cont.threshold_dB = -Inf;
     set(ImageH(hidx), 'UserData', pwr_brt_cont);
     
     hidx = hidx + 1;
@@ -220,7 +256,6 @@ while ~ done
 end
 
 fclose(handle);
-AxisH = gca;
 set(AxisH, 'XLim', [Start_s, Stop_s]);
 set(AxisH, 'YDir', 'normal');
 set(AxisH, 'YLim', [fkHz(1), fkHz(end)]);
@@ -228,9 +263,9 @@ set(AxisH, 'fontsize', 12, 'fontweight', 'b');
 xlabel('time (s)', 'fontsize', 12, 'fontweight', 'b');
 ylabel('freq (kHz)', 'fontsize', 12, 'fontweight', 'b');
 
-colorbar_h = colorbar;
-set(get(colorbar_h, 'YLabel'), ...
-    'String', 'Spectrum Level [dB re counts^2/Hz]', 'fontsize', 12,...
+ColorbarH = colorbar('peer', AxisH);
+set(get(ColorbarH, 'YLabel'), ...
+    'String', 'Spectrum Level (rel dB)', 'fontsize', 12,...
     'fontweight', 'b');
 
 if ~ isempty(AxisColor)
@@ -238,7 +273,9 @@ if ~ isempty(AxisColor)
     set(AxisH, 'YColor', AxisColor);
     set(get(AxisH, 'XLabel'), 'Color', AxisColor);
     set(get(AxisH, 'YLabel'), 'Color', AxisColor);
-    set(colorbar_h, 'YColor', AxisColor);
-    set(get(colorbar_h, 'YLabel'), 'Color', AxisColor);
+    set(ColorBarH, 'YColor', AxisColor);
+    set(get(ColorBarH, 'YLabel'), 'Color', AxisColor);
 end
-1;
+% We have modified the plot.  If the user has zoomed in before, we need
+% to let zoom know that the zoom limits have changed.
+zoom reset;

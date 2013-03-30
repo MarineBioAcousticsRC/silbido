@@ -1,4 +1,4 @@
-function tonalList = dtTonalsLoad(Filename, gui)
+function [tonalList, headerInfo, Filename] = dtTonalsLoad(Filename, gui)
 % tonalList = dtTonalsLoad(Filename, gui)
 % Load a set of tonals from Filename.  If Filename is [] or gui is true
 % the filename is requested via dialog with Filename (if any) as the
@@ -8,6 +8,9 @@ function tonalList = dtTonalsLoad(Filename, gui)
 %                       []
 %
 % Omit gui or set it to false to simply load from the specified file.
+import tonals.*
+
+headerInfo = [];
 
 error(nargchk(1,2,nargin));
 if nargin < 2
@@ -19,11 +22,19 @@ if nargin < 2
 end
 
 if gui
-    [LoadFile, LoadDir] = uigetfile({'*.bin'; '*.det'; '*.ton'},...
+    [LoadFile, LoadDir] = uigetfile(...
+        {'*.ann;*.bin', 'Annotation File'
+         '*.det', 'Detections'
+         '*.d-', 'False Detections'
+         '*_s.gt+;*_s.gt-;*_s.d+', 'Above SNR ground truth and valid detections'
+         '*_a.gt+;*_a.gt-;*_a.d+', 'All ground truth and valid detections'
+         '*', 'All files',
+         '*.ton', 'legacy tonal format (not recommended)'},...
         'Load Tonals', Filename);
     
     % check for cancel
     if isnumeric(LoadFile)
+        Filename = [];
         tonalList = [];
         return
     else
@@ -32,9 +43,13 @@ if gui
 end
 
 [path name ext] = fileparts(Filename);
-if strcmp(ext, '.bin') || strcmp(ext, '.det')
+if ~strcmp(ext, '.ton')
     % loads binary file
-    tonalList = tonals.tonal.tonalsLoadBinary(Filename);
+    tonalBIS = TonalBinaryInputStream;
+    
+    tonalBIS.tonalBinaryInputStream(Filename);    % retrieve linked list
+    tonalList = tonalBIS.getTonals(); 
+    headerInfo = tonalBIS.getHeader();  
 else if strcmp(ext, '.ton')
         % loads objects
         tonalList = tonals.tonal.tonalsLoad(Filename);
