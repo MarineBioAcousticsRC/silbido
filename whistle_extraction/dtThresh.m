@@ -38,6 +38,9 @@ thr.broadband = .01;
 % when computing the local polynomial fit.
 thr.disambiguate_s = .3;
 
+% framing parameters
 thr.advance_ms = 2;
 thr.length_ms = 8;
-thr.blocklen_s = 3;        % Data processed in N s blocks
+
+% Data processed in N s blocks
+thr.blocklen_s = 3;

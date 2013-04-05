@@ -1,47 +1,4 @@
-function triton
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% triton.m
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% v 1.62.20060914 smw - ltsa for wav files
-%
-% v1.60 060221 - 060227 smw
-% 060210 smw modified for LTSA triton v1.60
-% 060203smw haven't compiled in a long time....
-%
-% matlab compiled triton 1.50, sometimes...
-%
-% initial development 5/5/04 smw
-% for most recent revision date, see helppd.m
-% 
-% version 1.51 new control window and timing
-% 
-% version 1.50 smw
-% add capability to use dirlist times in xwav header
-% fix various bugs and add new and previously available capabilities.
-%
-%
-% subroutines to link with main during compiling 
-% because these are called via 'Callback'
-% note: do NOT name these with capital letters because compiler converts
-% them to small letters and Callback will point to incorrect filename.
-%
-% Do not modify the following line, maintained by CVS
-% $Id: triton.m,v 1.8 2010/04/06 19:39:39 mroch Exp $
-
-%#function filepd
-%#function toolpd
-%#function displaypd
-%#function paramspd
-
-%#function motion
-%#function control
-%#function logcontrol
-
-%#function bin2xwav
-
-%#function helppd
+function dev_init
 
 clear global;  % clear out old globals
 clc;        % clear command window  -- not needed for compiled
@@ -49,36 +6,34 @@ clc;        % clear command window  -- not needed for compiled
 close('all', 'hidden');  % close all figure windows
 warning off % this is turned off for plotting messages
 
-
 % Add subdirectories to search path
-RootDir = '.';
+RootDir = pwd();
 addpath(genpath2('.', 'ExcludeDirs', {'whistle','.hg', '.hgcheck','lib', 'java', 'build'}, 'ExcludeRootDir', 1));
 
-% Add Java directories to path
-java_archives = utFindFiles(fullfile(RootDir, 'whistle/src'), 1);
-if ~ isempty(java_archives);
-    javaaddpath(java_archives);
+% Set up java.
+import tonals.*;
+
+% First try to load it from where eclipse compiles code.
+java_bin_dir = fullfile(RootDir, 'whistle/bin/');
+javaaddpath(java_bin_dir);
+
+% If we didn't find it check in the ant build dir.
+if (~exist('tonals.tonal')) 
+    java_build_dir = fullfile(RootDir, 'whistle/build');
+    javaaddpath(java_build_dir);
 end
-javaaddpath(fullfile(RootDir, 'java/'));
-addpath(fullfile(RootDir, 'whistle'));
-addpath(fullfile(RootDir, 'audio'));
 
-global PARAMS
-PARAMS.ver = 'Detector 2010-04-06 (based on 1.63.20070212)';
+% If we still didn't find it try to load the distribution
+% jar file.
+if (~exist('tonals.tonal')) 
+    java_dist_dir = fullfile(RootDir, 'whistle/dist');
+    java_archives = utFindFiles({'*.jar'}, {java_dist_dir}, 1);
+    if ~ isempty(java_archives);
+        javaaddpath(java_archives);
+    end
+end
 
-disp(' ')
-disp(['         Triton version ',PARAMS.ver])
+if (~exist('tonals.tonal')) 
+    error('Could not load java classes.');
+end
 
-
-initparams
-%disp(PARAMS)
-
-initwins
-
-initcontrol
-
-init_coorddisp
-
-initpulldowns
-
-dt_initcontrol

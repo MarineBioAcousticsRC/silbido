@@ -1,4 +1,4 @@
-function results = scoreall(detext, CorpusBase, logfile)
+function results = scoreall(detext, CorpusBase, logfile, DetectionsBase)
 % results = scoreall(detext, CorpusBase)
 % Given an detections extension, find all detection
 % files in the current directory and compare them to the
@@ -31,12 +31,14 @@ if CorpusBase(end) ~= '\' || CorpusBase(end) ~= '/'
 end
 
 % get path to detections files and their basename
-[detections base] = utFindFiles({sprintf('*%s', detext)}, {'.'}, true);
+[detections base] = utFindFiles({sprintf('*%s', detext)}, {DetectionsBase}, true);
+relpath = cellfun(@(f) f(length(DetectionsBase)+1:end), detections, 'UniformOutput', false);
+
 % Construct names for audio and ground truth files
 audio = cellfun(@(f) fullfile(CorpusBase, strrep(f, detext, '.wav')), ...
-    detections, 'UniformOutput', false);
+    relpath, 'UniformOutput', false);
 gt = cellfun(@(f) fullfile(CorpusBase, strrep(f, detext, '.bin')), ...
-    detections, 'UniformOutput', false);
+    relpath, 'UniformOutput', false);
 
 % Verify all files exist before we start
 N = length(detections);
