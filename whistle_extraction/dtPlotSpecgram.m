@@ -234,6 +234,7 @@ while ~ done
     % plot the block
     ImageH(hidx) = image(Indices.timeidx, fkHz, snr_dB, 'Parent', AxisH);  
     colorData = (contrast_Pct/100) .* snr_dB + bright_dB;
+    colorData = snr_dB;
     set(ImageH(hidx), 'CData', colorData);
     
     % Store the snr, brightness and contrast in UserData structure
@@ -279,3 +280,4 @@ end
 % We have modified the plot.  If the user has zoomed in before, we need
 % to let zoom know that the zoom limits have changed.
 zoom reset;
+

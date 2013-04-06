@@ -10,6 +10,12 @@ function dtPlotTonalSet(Filename, Tonalset, Color, Start_s, Stop_s, ...
 % Start_s - start time in s
 % Stop_s - stop time in s
 % Optional arguments in any order:
+%   'ParameterSet', String or struct
+%       Default set of parameters.  May either be a string
+%       which is passed to dtThresh or a parameter structure
+%       that has been loaded from dtThresh and possibly modified.
+%       This argument is processed before any other argument, and other
+%       arguments may override these values.
 %   'Framing', [Advance_ms, Length_ms] - frame advance and length in ms
 %       Defaults to 2 and 8 ms respectively
 %   'Noise', method
@@ -22,9 +28,12 @@ function dtPlotTonalSet(Filename, Tonalset, Color, Start_s, Stop_s, ...
 import tonals.*;
 
 % Defaults
-Advance_ms = 2;
-Length_ms = 8;
-NoiseMethod = 'median';
+
+% The threshold set is processed before any other argument as other
+% arguments override the parameter set.
+thr = dtParseParameterSet(varargin{:});  % retrieve parameters
+
+NoiseMethod = {'median'};
 scale = 1000; % kHz;
 
 if length(Tonalset) ~= length(Color)
@@ -38,12 +47,14 @@ while k <= length(varargin)
             if length(varargin{k+1}) ~= 2
                 error('%s must be [Advance_ms, Length_ms]', varargin{k});
             else
-                Advance_ms = varargin{k+1}(1);
-                Length_ms = varargin{k+1}(2);
+                thr.advance_ms = varargin{k+1}(1);
+                thr.length_ms = varargin{k+1}(2);
             end
             k=k+2;
         case 'Noise'
             NoiseMethod = varargin{k+1}; k=k+2;
+        case 'ParameterSet'
+            k=k+2; % processed earlier
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -61,7 +72,7 @@ end
 % Plot Spectrogram
 colormap(bone);
 [notused ImageH] = dtPlotSpecgram(Filename, Start_s, Stop_s, ...
-    'Framing', [Advance_ms, Length_ms], 'Noise', NoiseMethod);
+    'Framing', [thr.advance_ms, thr.length_ms], 'Noise', NoiseMethod);
 % Load the icon stored in icon.mat
 load icon;
 % Add Brightness/Contrast icon to standard toolbar. When pushed
@@ -94,7 +105,7 @@ for tset = 1 : length(Tonalset)
                 (t(1) >= Start_s && t(1) <= Stop_s)
             
             f = tonal.get_freq() / scale;
-            plot(t, f, 'Color', Color{tset});
+            plot(t, f, Color{tset});
         end
     end
 end

@@ -48,4 +48,3 @@ end
 % Estimate noise and remove via spectral means subtraction
 % we may want to move to a better way of doing this
 snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp, ~clickP);
-

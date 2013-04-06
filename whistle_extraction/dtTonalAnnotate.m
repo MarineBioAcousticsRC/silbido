@@ -1595,7 +1595,7 @@ if isnumeric(Filename)
 else
     data = get(handles.Annotation, 'UserData');
     data.Filename = fullfile(FileDir, Filename);
-    cd(FileDir);
+    %cd(FileDir);
     data.hdr = ioReadWavHeader(data.Filename);
     % defaults
     data.Start_s = 0;
@@ -1904,7 +1904,7 @@ end
 brightness = get(handles.Brightness, 'Value');
 contrast = get(handles.Contrast, 'Value');
 
-colormap(data.SpecgramColormap);
+%colormap(data.SpecgramColormap);
 % minimum value may be set < 0 for knot editing
 % make sure spectrogram is >= 0
 low_spec_Hz = max(0, data.low_disp_Hz);

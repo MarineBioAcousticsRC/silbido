@@ -194,7 +194,7 @@ while ~ done
         stop = min([stop + MApad_s, eof_s]);
 
         % for now:
-        fprintf('Processing %.2f s:  %f to %f:', stop-start, start, stop);
+        fprintf('Processing %d gt tonals in %.2f s:  %f to %f:', sum(process > 0),stop-start, start, stop);
         fprintf(' %d', find(process));
         fprintf('\n');
         if 0

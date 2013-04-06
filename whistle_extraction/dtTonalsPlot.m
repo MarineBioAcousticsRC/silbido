@@ -1,6 +1,5 @@
-function dtTonalsPlot(Filenames, tonals, graphs, ...
-    Start_s, Stop_s, varargin)
-% dtTonalsTracking(Filenames, tonals, graphs, Start_s, Stop_s, OptionalArgs)
+function dtTonalsPlot(Filenames, tonals, graphs, Start_s, Stop_s, varargin)
+% dtTonalsPlot(Filename(s), tonals, graphs, Start_s, Stop_s, OptionalArgs)
 % Filenames - Cell array of filenames that are assumed to be consecutive
 %            Example -  {'palmyra092007FS192-071011-230000.wav',
 %                        'palmyra092007FS192-071011-231000.wav'}
@@ -34,12 +33,21 @@ function dtTonalsPlot(Filenames, tonals, graphs, ...
 %       Note that the specified parameters override what would have been
 %       plotted by default.  Thus, the range is still appropriate and
 %       the default noise subtraction are used.
+%   'ParameterSet', String or struct
+%       Default set of parameters.  May either be a string
+%       which is passed to dtThresh or a parameter structure
+%       that has been loaded from dtThresh and possibly modified.
+%       This argument is processed before any other argument, and other
+%       arguments may override these values.
 %   'NewFigure', boolean
 %       Create new figure (default) or plot on existing one.
 %       When plotting on an existing figure, plotting multiple
 %       things is likely to cause problems due to the call to subplot.
 %    'AxisColor', Color
 %       Plot labels and axis in specified color, e.g. 'w' - white
+%    'ReverseColor', true|false (default false)
+%       Colormap is flipped such that high energy plots are displayed
+%       as darker colors
 %
 % Example call:
 % [tonals graphs]= dtTonalsTracking(File, t0, t1, 'Framing', [2, 8]);
@@ -52,12 +60,12 @@ import tonals.*;
 PathType = {'tonal'};   % plot whistles
 AxisColor = {};
 NewFigure = true;
-plotspec = true;  % plot spectrogram underneath desired information?
 BlackWhite = true;
+ReverseColor = false;
 HzPerkHz = 1000;
-Cutoff_Hz = 50000;
-Advance_ms = 2;
-Length_ms = 8;
+% The threshold set is processed before any other argument as other
+% arguments override the parameter set.
+thr = dtParseParameterSet(varargin{:});
 
 SpecArgs = {};   % plot tonals over default spectrogram
 
@@ -72,19 +80,24 @@ coloridx = 1;
 % processs arguments -------------------------------------
 k = 1;
 
+if ischar(Filenames)
+    Filenames = {Filenames};
+end
+
 while k <= length(varargin)
     switch varargin{k}
         case 'Framing'
             if length(varargin{k+1}) ~= 2
                 error('%s must be [Advance_ms, Length_ms]', varargin{k});
             else
-                Advance_ms = varargin{k+1}(1);
-                Length_ms = varargin{k+1}(2);
+                thr.advance_ms = varargin{k+1}(1);
+                thr.length_ms = varargin{k+1}(2);
             end
             k=k+2;
         case 'AxisColor'
-            AxisColor = {varargin{k+1}}; k=k+2;
-            
+            AxisColor = varargin(k+1); k=k+2;
+        case 'ParameterSet'
+            k=k+2; % already processed
         case 'Plot'
             PathType = varargin{k+1}; k=k+2;
             if ischar(PathType)
@@ -111,6 +124,12 @@ while k <= length(varargin)
         case 'NewFigure'
             NewFigure = varargin{k+1}; k=k+2;
             
+        case 'ReverseColor'
+            ReverseColor = varargin{k+1}; k=k+2;
+            if ~ isscalar(ReverseColor)
+              error('%s must be true or false', varargin{k});
+            end
+            
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -136,8 +155,6 @@ else
     figH = gcf;  % use current figure
 end
 
-resolutionHz = (1000 / Length_ms);
-
 PathTypeN = length(PathType);
 holdstate = ishold;
 
@@ -148,24 +165,29 @@ holdstate = ishold;
              SpecArgList = SpecArgs;
          else
              % charcteristics for all spectrograms
-             SpecArgList = {{SpecArgs}};
+             SpecArgList = {SpecArgs};
          end
      else
          SpecArgList = {{SpecArgs}};
      end
  else
-     SpecArgList = {{SpecArgs}};
+     SpecArgList = {SpecArgs};
  end
  
 ImageH = []; % Image handle (Spectrogram)
-
+ax = zeros(PathTypeN, 1);
 for s=1:PathTypeN
     set(0, 'CurrentFigure', figH);  % make figure current
-    SpecArgs = spectrogram_params(SpecArgList{min(s, length(SpecArgList))}, Advance_ms, Length_ms, Cutoff_Hz, AxisColor);
+    SpecArgs = spectrogram_params(...
+        SpecArgList{min(s, length(SpecArgList))}, ...
+        thr.advance_ms, thr.length_ms, thr.high_cutoff_Hz, AxisColor);
     if BlackWhite
-        colormap(bone);
+        map = bone;
     else
-        colormap(jet);
+        map = jet;
+    end
+    if ReverseColor
+        map = flipud(map);
     end
     % Set appropriate subplot if needed
     if PathTypeN > 1
@@ -173,17 +195,18 @@ for s=1:PathTypeN
     else
         ax(s) = gca;
     end
+    colormap(map);
     hold on
     
     if ~ isempty(SpecArgs)
         % might be nice to plot once and duplicate image, worry about
         % that later
-        colormap(bone);
-        [notused ImH] = dtPlotSpecgram(Filenames{file_idx}, Start_s, Stop_s, SpecArgs{:});
+        [notused ImH] = dtPlotSpecgram(Filenames{file_idx}, ...
+            Start_s, Stop_s, 'ParameterSet', thr, SpecArgs{:});
         ImageH = [ImageH ImH];
         hold on
     end
-    tic;
+    start_t = tic;
     switch PathType{s} 
         case 'spectrogram'
             % do nothing
@@ -201,7 +224,7 @@ for s=1:PathTypeN
                 case 'graph'
                     [newh, coloridx] = dtPlotGraph(toneset, 'ColorMap',colors, ...
                         'ColorIdx', coloridx, 'DistinguishEdges', false, ...
-                        'Marker', '.', 'LineWidth', 2, ...
+                        'LineWidth', 2, ...
                         'EdgeCallback', @dagcb); %@dtEdgePhaseCB);
                     
                 case 'phase'
@@ -222,43 +245,15 @@ for s=1:PathTypeN
                         'ColorMap', colors, 'ColorIdx', coloridx, ...
                         'DistinguishEdges', true, EdgeCallback{:});
                     
-                case 'phase'
-                    if isempty(Advance_ms)
-                        error('Framing argument is mandatory for phase');
-                    end
-                                                           
-                    ColorPhaseN = 36;
-                    ColorMap = hsv(ColorPhaseN);
-                    % Obtain the edges
-                    edges = toneset.topological_sort();
-                    % preallocate handles cell array
-                    handles = cell(edges.size(), 1);
-                    
-                    % Loop through each edge
-                    segIt = edges.iterator();
-                    hidx = 1;
-                    
-                    while segIt.hasNext()
-                        edge = segIt.next();
-                        tone = edge.content;
-                        time = tone.get_time();
-                        freq = tone.get_freq() / HzPerkHz;
-                        
-                        handles{idx} = ...
-                            dtPlotGraph(toneset, 'ColorMap', colors, ...
-                            'ColorIdx', coloridx, 'Plot', 'phase')
-                        hidx = hidx + 1;
-                        
-                    end
-                    
                 otherwise
-                    error('Bad argument to Show:  %s', PathType);
+                    error('Bad argument to Show:  %s', PathType{s});
             end
             coloridx = mod(coloridx, colorsN) + 1;
          end
     end
     fprintf('Compute & render %s: ', PathType{s});
-    tock;
+    fprintf('\nElapsed time since start:  %s\n', ...
+        datestr(datenum(0, 0, 0, 0, 0, toc(start_t)), 13));
     title(PathType{s});
     xlabel('time (s)')
     ylabel('freq (kHz)')
@@ -292,7 +287,7 @@ if iscell(ArgList)
     % spectrogram desired, set parameters
     Defaults = {'Framing', [Advance_ms, Length_ms], ...
         'Click_dB', 10,  ...
-        'Noise', 'median', 'AxisColor', AxisColor};
+        'Noise', {'median'}, 'AxisColor', AxisColor};
     if ~ isempty(ArgList)
         if isempty(ArgList{1})
             if iscell(ArgList{1})
