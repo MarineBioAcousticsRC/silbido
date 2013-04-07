@@ -1672,7 +1672,7 @@ if strcmp(action, 'Overwrite')
     [handles, data] = clear_RenderedAnnotations(handles, data);
 end
 data.annotations = ...
-    dtTonalsTracking(data.Filename, 0, Inf);
+    dtTonalsTracking(data.Filename, 0, Inf, 'ParameterSet', data.thr);
 set(handles.Annotation, 'UserData', data);
 
 [handles, data] = plot_tonals(handles, data);
@@ -1904,7 +1904,7 @@ end
 brightness = get(handles.Brightness, 'Value');
 contrast = get(handles.Contrast, 'Value');
 
-%colormap(data.SpecgramColormap);
+colormap(data.SpecgramColormap);
 % minimum value may be set < 0 for knot editing
 % make sure spectrogram is >= 0
 low_spec_Hz = max(0, data.low_disp_Hz);

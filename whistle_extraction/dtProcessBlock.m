@@ -201,8 +201,44 @@ end
     noise_intensity_dB, NoiseSub{1});
 
 % Convert the padding to frames and remove the frames that should
+% not be processed.
+Advance_s = Advance_samples / header.fs;
+if start_pad > 0
+    startRange = [1:round(start_pad / Advance_s)];
+else
+    startRange = [];
+end
 
-
+framesN = size(snr_power_dB, 2);  % total # of frames
+if stop_pad >= 0
+    start_of_end_idx = round(max(0, stop - stop_pad - start)/Advance_s);
+    stopRange = [start_of_end_idx:Indices.FrameCount];
+else
+    stopRange = [];
+end
+deleteRange = [startRange, stopRange];
+if ~ isempty(deleteRange)
+    snr_power_dB(:, deleteRange) = [];
+    dft(:, deleteRange) = [];
+    clickP(deleteRange) = [];
+    % # of samples we lost to padding on either side
+    pad_samples = round((start_pad + stop_pad) * header.fs);
+    % Recompute indices
+    Indices = spFrameIndices(length(Signal)-pad_samples, ...
+        [Length_samples, Advance_samples], ...
+        'LastFrame', size(snr_power_dB, 2), ...
+        'FrameRate', 1/Advance_s);
+    
+    % It looks like we lost frames based on the new interval,
+    % but we know better because we computed the padded interval
+    % first and now we are just recomputing the labels w/o padding
+    if ~isempty(deleteRange) 
+        Indices.FrameLastComplete = Indices.FrameCount;
+    end
+    % Remove padding from signal
+    Signal = Signal(round(start_pad*header.fs+1) : ...
+        length(Signal)-round(stop_pad*header.fs));
+end
 
 % relative to file rather than block
 Indices.timeidx = Indices.timeidx + StartBlock_s;

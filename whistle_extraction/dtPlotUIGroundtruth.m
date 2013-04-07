@@ -954,8 +954,12 @@ set(HANDLES.fig, 'Visible', 'on');
         
         if length(t) > 1
             polynomial = spline(t, f);
-            ntime = linspace(t(1),t(end), ...
-                (thr.advance_ms / 1000) * hdr.fs);
+            % User clicked at a specific point
+            advance_s = thr.advance_ms / 1000;
+            start = floor(t(1)/advance_s)*advance_s;
+            stop = floor(t(end)/advance_s)*advance_s;
+            N = round((stop - start)/advance_s)+ 1;
+            ntime = linspace(start, stop, N);
             nfreq = ppval(polynomial, ntime);
         else
             ntime = t;  % degenerate case
