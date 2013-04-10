@@ -7,6 +7,8 @@ import java.io.DataInputStream;
 import java.io.BufferedInputStream;
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.Vector;
+import java.lang.Double;
 
 public class TonalBinaryInputStream {
 
@@ -19,10 +21,53 @@ public class TonalBinaryInputStream {
 	short fbit_mask = 0x0;	// initialize internal feature bit-mask
 	public LinkedList<tonal> tonals;
 	
+	private Vector<Double> confidence;
+	private Vector<Double> score;
+	
+	/*
+	 * Return linked list of tonals
+	 */
 	public LinkedList<tonal> getTonals() {
 		return tonals;
 	}
 	
+	/* 
+	 * Return array of confidences for read tonals
+	 */
+	public double[] getConfidences() {
+		double[] conf = null;
+		
+		if (hdr.hasConfidence()) {
+			int N = confidence.size();
+			conf = new double[N];
+			for (int idx=0; idx < N; idx++) {
+				conf[idx] = confidence.get(idx).doubleValue();
+			}
+		} else {
+			conf = null;
+		}
+		return conf;				
+	}
+	
+	/*
+	 * Return array of scores for read tonals
+	 */
+	public double[] getScores() {
+		double[] scr = null;
+		
+		if (hdr.hasScore()) {
+			int N = score.size();
+			scr = new double[N];
+			for (int idx=0; idx < N; idx++) {
+				scr[idx] = score.get(idx).doubleValue();
+			}
+		}
+		return scr;		
+	}
+
+	/*
+	 * Return the header associated with the tonals
+	 */
 	public TonalHeader getHeader() {
 		return hdr;
 	}
@@ -36,10 +81,23 @@ public class TonalBinaryInputStream {
 			datastream = new DataInputStream(buffstream);
 			
 			// Remember this position until N more bytes are read
-			datastream.mark(10);  
+			// (after that, we can forget about it)
+			datastream.mark(TonalHeader.magicLen + 1);  
 			
 			hdr = new TonalHeader(datastream);
 
+			// Allocate confidence & score vectors if needed.
+			if (hdr.hasConfidence()) {
+				confidence = new Vector<Double>(100, 100);
+			} else {
+				confidence = null;				
+			}
+			if (hdr.hasScore()) {
+				score = new Vector<Double>(100,100);				
+			} else {
+				score = null;
+			}
+			
 			if (hdr.userVersion == -1){
 				// No header was present, rewind file and default assumptions
 				datastream.reset();
@@ -54,7 +112,10 @@ public class TonalBinaryInputStream {
 	}
 
 
-	public LinkedList<tonal> readTonalStream(short featBitMask) 
+	/*
+	 * Read in tonals
+	 */
+	private LinkedList<tonal> readTonalStream(short featBitMask) 
 	throws IOException, EOFException
 	{
 
@@ -65,6 +126,16 @@ public class TonalBinaryInputStream {
 		// Read in time and freq from the file and create list of tonals
 		try {
 			while(true){
+				
+				// Read in metadata about this tonal if specified
+				if (hdr.hasConfidence()) {
+					confidence.add(datastream.readDouble());
+				}
+				if (hdr.hasScore()) {
+					score.add(datastream.readDouble());
+				}
+				
+				// Read tonal itself
 				tonal t = null;
 				int N = datastream.readInt();
 				LinkedList<tfnode> tfnodes = new LinkedList<tfnode>();
