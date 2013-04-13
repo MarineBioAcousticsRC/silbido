@@ -1,4 +1,4 @@
-function [snr_dB, Indices, dft, clickP] = ...
+function [power_dB, snr_dB, Indices, dft, clickP] = ...
     dtSpecAnal(Signal, Fs, Length, Advance, Shift, Range, ...
         BroadbandThrN, ClickThr_dB, NoiseComp)
 % [snr_dB, Indices, dft, clickP] = dtSpecAnal(
@@ -47,4 +47,7 @@ end
 
 % Estimate noise and remove via spectral means subtraction
 % we may want to move to a better way of doing this
-snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp, ~clickP);
+if ~ iscell(NoiseComp)
+    NoiseComp = {NoiseComp};
+end
+snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp{:}, ~clickP);
