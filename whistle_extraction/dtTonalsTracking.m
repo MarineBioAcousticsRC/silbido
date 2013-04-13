@@ -9,6 +9,8 @@ function [tonals, subgraphs] = dtTonalsTracking(Filenames, Start_s, Stop_s, vara
 %   'Framing', [Advance_ms, Length_ms] - frame advance and length in ms
 %       Defaults to 2 and 8 ms respectively
 %   'Threshold', N_dB - Energy threshold in dB
+%   'ParameterSet', Name - Set of default parameters, currently
+%        supports 'odontocete' (default) and 'mysticete'
 %   'Interactive', bool - Wait for a keypress before processing the next
 %       frame.  Only valid when plot options are used (default false).
 %   'Plot', N - Shows formation of tonals interactively
@@ -27,8 +29,21 @@ function [tonals, subgraphs] = dtTonalsTracking(Filenames, Start_s, Stop_s, vara
 %       It is recommended that the same noise compensation as
 %       used for creating the tonal set be used.  See
 %       dtSpectrogramNoiseComp for valid methods.
-%   'DetectorRange', [LowCutoff_Hz, HighCutoff_Hz] - low and high cutoff
+%   'RemoveTransients' true(default)|false - Remove short broadband
+%       interference (e.g. echolocation clicks) in the time domain
+%   'Range', [LowCutoff_Hz, HighCutoff_Hz] - low and high cutoff
 %       frequency in Hz. Defaults to 5000 and 50000 Hz respectively
+%   'WaitTimeRejection', [N, MeanWait_s, MaxDur_s]
+%       Reject a detection as a false positive if the mean wait time
+%       between N successive time X frequency peaks is > MeanWait_s
+%       seconds.  Detections longer than MaxDur_s are not subject to
+%       this test.
+%       Empirical analysis of the detections in our October 2011 JASA
+%       article suggests that [5, .034, .4] results in a 10% miss rate
+%       for tonals < .4 s that would have otherwise been detected and
+%       results in a lowering of the FA rate for tonals of the same
+%       duration by about 60%.  
+%   The following options are currently depreccated and should not be used:
 %   'TonalFile', File - Store the detected tonals to binary file.
 %   'GraphFile', File - Store the graphs to binary file.
 
@@ -49,9 +64,18 @@ handles = [];
 subgraphs_closed = 0;
 Plot = 0;
 Interactive = false;
+Debug = false;
+
 
 if ~iscell(Filenames)
-    Filenames = {Filenames};
+    if isempty(Filenames)
+        % add GUI filenames selection later
+        error('Silbido:Specify filenames');
+    elseif ischar(Filenames)
+        Filenames = {Filenames};  % assume user provided a single filename
+    else
+        error('Silbido:Specify filenames');
+    end
 end
 
 % Settable Thresholds --------------------------------------------------
@@ -97,14 +121,16 @@ NoiseSub = 'median';          % what type of noise compensation
 MovieFile = [];      % generate a movie
 GraphFile = [];      % Save graphs to file
 TonalFile = [];      % Save detected tonals to file
+RemoveTransients = false;  % mitigate for clicks/snapping shrimp
+WaitTimeRejection = [];
 
 k = 1;
-errstr = 'Bad option: Either enter Slope_s OR Slope_avg_s OR Peakslope OR Phase_s option';
 while k <= length(varargin)
     switch varargin{k}
         case 'Framing'
             if length(varargin{k+1}) ~= 2
-                error('%s must be [Advance_ms, Length_ms]', varargin{k});
+                error('Silbido:Framing', ...
+                    '%s must be [Advance_ms, Length_ms]', varargin{k});
             else
                 Advance_ms = varargin{k+1}(1);
                 Length_ms = varargin{k+1}(2);
@@ -116,25 +142,41 @@ while k <= length(varargin)
             Plot = varargin{k+1}; k=k+2;
         case 'Threshold'
             thr.whistle_dB = varargin{k+1}; k=k+2;
+        case 'ParameterSet'
+            k=k+2;  % already handled
         case 'ActiveSet_s'
             thr.activeset_s = varargin{k+1}; k=k+2;
         case 'Noise'
             NoiseSub = varargin{k+1}; k=k+2;
         case 'Movie'
             MovieFile = varargin{k+1}; k=k+2;
-        case 'DetectorRange'
+        case 'Range'
             if length(varargin{k+1}) ~= 2 || diff(varargin{k+1}) <= 0
-                error('%s must be [LowCutoff_Hz, HighCutoff_Hz]', varargin{k});
+                error('Silbido:DetectorRange', ...
+                    '%s must be [LowCutoff_Hz, HighCutoff_Hz]', ...
+                    varargin{k});
             else
                 thr.low_cutoff_Hz = varargin{k+1}(1);
                 thr.high_cutoff_Hz = varargin{k+1}(2);
             end
             k=k+2;
+        case 'RemoveTransients'
+            RemoveTransients = varargin{k+1}; k=k+2;
+            if RemoveTransients ~= false && RemoveTransients ~= true
+                error('RemoveTransients must be true or false');
+            end
         case 'TonalFile'
             TonalFile = varargin{k+1}; k=k+2;
         case 'GraphFile'
             GraphFile = varargin{k+1}; k=k+2;
-            
+        case 'WaitTimeRejection'
+            if length(varargin{k+1}) ~= 3
+                error('%s expecting [N_events, wait_s, maxdur_s]', ...
+                    varargin{k});
+            else
+                WaitTimeRejection = varargin{k+1};
+            end
+            k=k+2;
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -142,16 +184,16 @@ while k <= length(varargin)
                 else
                     errstr = sprintf('Bad option %s', char(varargin{k}));
                 end
-            catch
+            catch e
                 errstr = sprintf('Bad option in %d''optional argument', k);
             end
-            error(sprintf('Detector:%s', errstr));
+            error('Silbido:Arguments', 'Detector:%s', errstr);
     end
 end
 
 if Interactive && Plot > 0
     fprintf('Interactive, press/hold space to progress\n');
-end            
+end
 
 if ~ isempty(TonalFile)
     % open up file
@@ -322,69 +364,7 @@ while StartBlock_s + 2 * Length_s < Stop_s
        range_bins, thr.broadband * range_binsN, ...
        thr.click_dB, NoiseSub);
    
-   if isequal(NoiseSub, 'MA')
-       % We consider 50% more power spectrum on either side of block if
-       % present.
-       %
-       % Each of the below cases are considered. For explaination purpose
-       % assume block size to be 3 seconds and recording to be 5 minutes.
-       % Total Signal: 0-300s
-       %
-       % Case 1:
-       % Current block signal: 0-3s
-       % Signal considered: 0-4.5s
-       %
-       % Case 2:
-       % Current block signal: 3-6
-       % Signal considered: 1.5-7.5s
-       %
-       % Case 3:
-       % Current block signal: 277-300s
-       % Signal considered: 276.5-300s
-       
-       if StartBlock_s - (block_len_s/2) < Start_s
-           StartBlockAux_s = StartBlock_s;
-           start_sect = true;
-       else
-           StartBlockAux_s = StartBlock_s - (block_len_s/2);
-           start_sect = false;
-       end
-       if StopBlock_s + (block_len_s/2) > Stop_s
-           StopBlockAux_s = StopBlock_s;
-           stop_sect = true;
-       else
-           StopBlockAux_s = StopBlock_s + (block_len_s/2);
-           stop_sect = false;
-       end
-       
-       Signal_mavg = ioReadWav(handle, header, StartBlockAux_s, ...
-           StopBlockAux_s, 'Units', 's', 'Channels', channel);
-       
-       % Perform spectral analysis on block for moving average
-       [snr_power_dB, Indices_mavg, dft_mavg, clickP_mavg] = ...
-           dtSpecAnal(Signal_mavg, header.fs, Length_samples, ....
-           Advance_samples, shift_samples, range_bins, ...
-           thr.broadband * range_binsN, thr.click_dB, NoiseSub);
-       
-       if start_sect && stop_sect
-           % do nothing
-       else
-           if ~start_sect && ~stop_sect
-               idx = round((header.fs / Advance_samples) * (block_len_s)/2);
-               snr_power_dB = snr_power_dB(:, idx+1:(idx + (idx*2)-3));
-           end
-           if start_sect
-               % Frame last completed for current block
-               last_frame = Indices.FrameLastComplete;
-               snr_power_dB = snr_power_dB(:, 1:last_frame);
-           end
-           if stop_sect
-               idx = round((header.fs / Advance_samples) * (block_len_s/2));
-               snr_power_dB = snr_power_dB(:, idx+1:end);
-           end
-       end
-       
-   end
+   
    
    % relative to file rather than block
    Indices.timeidx = Indices.timeidx + StartBlock_s;
