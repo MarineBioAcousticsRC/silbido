@@ -968,7 +968,7 @@ function Contrast_Callback(hObject, eventdata, handles)
 brightness = get(handles.Brightness, 'Value');
 contrast = get(hObject, 'Value');
 set(handles.ContrastValue, 'String', num2str(contrast));
-handles.colorbar = colorbar('peer', handles.spectrogram)
+handles.colorbar = colorbar('peer', handles.spectrogram);
 dtBrightContrast(handles.image, brightness, contrast, -Inf, handles.colorbar);
 guidata(handles.Annotation, handles);
 
