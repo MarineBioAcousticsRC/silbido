@@ -12,19 +12,25 @@ function Performance = ...
 % It is assumed that both sets of tonals are sorted by start time.
 % Optional arguments:
 %   'Framing', [Advance_ms, Length_ms] - frame advance and length in ms
-%       Defaults to 1 and 2 ms respectively
+%       See dtThresh for defaults.
+%   'ParameterSet', String or struct
+%       Default set of parameters.  May either be a string
+%       which is passed to dtThresh or a parameter structure
+%       that has been loaded from dtThresh and possibly modified.
+%       This argument is processed before any other argument, and other
+%       arguments may override these values.
 %   'Noise', Method
 %       Method for noise compensation in spectrogram plots.
 %       It is recommended that the same noise compensation as
 %       used for creating the tonal set be used.  See
 %       dtSpectrogramNoiseComp for valid methods.
-%   'GroundTruthCriteria', [dB, RatioAbove_SNR, MinLen] 
+%   'GroundTruthCriteria', [dB, RatioAbove_SNR, MinLen_s] 
 %       Criteria for determining whether or not to expect each ground
 %       truth tonal to be detected.  When tonals are detected but we
 %       did not expect them to be, they are not counted towards the
 %       recall, but they will not be used to penalize the precision.
 %       Default:  [-inf, .5, 0]
-%       Q: Shall we include a minimum coverage parameter?
+%       Question: Shall we include a minimum coverage parameter?
 % 
 % Output:
 % Performance structure:
@@ -53,11 +59,12 @@ function Performance = ...
 % dtPlotUIGroundtruth(File, tonals, t0, t1);
 % dtPerformance(File, tonals, ground_truth_tonal);
 
-tic;
+stopwatch = tic;
 
 SNR_dB = -inf;  % threshold
 RatioAbove_SNR = .333;
-NoiseSub = 'median';
+NoiseSub = {'median'}; 
+%NoiseSub = {'median', [3 3], 3};  % with 3 s MA
 
 %warning off;
 import tonals.*;
@@ -70,7 +77,28 @@ MApad_s = MA_s/2;  % Pad by half of window on either side whenever possible
 PeakTolerance_Hz = 500;  % search for peaks in ground truth +/- PeakTolerance_Hz
 MatchTolerance_Hz = 350;
 
+% The threshold set is processed before any other argument as other
+% arguments override the parameter set.
 thr = dtThresh();
+thr.blocklen_s = 5;
+thr.PeakTolerance_Hz = 500;
+thr.MatchTolerance_Hz = 350;
+
+% Our ground truth annotation tools fit tonals with cubic splines.
+% As a result, it is not uncommon for the tonal path to deviate
+% slightly from actual tonal.  As a consequence, we search up/down
+% for the strongest peak within a specified interval.
+PeakTolerance_Hz = thr.PeakTolerance_Hz;
+
+% The adjusted ground truth peak (see thr.PeakTolerance_Hz) must
+% be within this distance of the detected frequency to be
+% considered a match.
+MatchTolerance_Hz = thr.MatchTolerance_Hz;
+
+ms_per_s = 1000;
+Length_s = thr.length_ms / ms_per_s;  % frame parameters
+Advance_s = thr.advance_ms / ms_per_s;
+
 
 % Process arguments
 error(nargchk(3, inf, nargin));
@@ -81,23 +109,36 @@ while k <= length(varargin)
             if length(varargin{k+1}) ~= 2 || ~ isnumeri(varargin{k+1})
                 error('%s must be [Advance_ms, Length_ms]', varargin{k});
             else
-                Advance_ms = varargin{k+1}(1);
-                Length_ms = varargin{k+1}(2);
+                Advance_s = varargin{k+1}(1) / ms_per_s;
+                Length_s = varargin{k+1}(2) / ms_per_s;
             end
             k=k+2;
         case 'Noise'
             NoiseSub = varargin{k+1}; k=k+2;
         case 'GroundTruthCriteria'
-            if ~ isnumeric(varargin{k+1}) || length(varargin{k+1}) ~= 2
-                error('GroundTruthCriteria expecting [SNR_dB, RatioAbove_SNR]');
+            if ~ isnumeric(varargin{k+1}) || length(varargin{k+1}) > 3
+                error('%s expecting [SNR_dB, RatioAbove_SNR, MinLen_ms]', ...
+                    varargin{k});
             else
-                SNR_dB = varargin{k+1}(1);
-                RatioAbove_SNR = varargin{k+1}(2);
-                if abs(RatioAbove_SNR - .5) > .5
-                    error('Expecting RatioAbove_SNR in [0, 1]');
+                params = varargin{k+1};
+                if length(params)
+                    SNR_dB = params(1);
+                    if length(params) > 1
+                        RatioAbove_SNR = params(2);
+                        if abs(RatioAbove_SNR - .5) > .5
+                            error('%s expecting RatioAbove_SNR in [0, 1]', ...
+                                varargin{k});
+                        end
+                        if length(params) > 2
+                            % Minimum length s --> ms
+                            thr.minlen_ms = params(3)*1000.0;
+                        end
+                    end
                 end
             end
             k=k+2;
+        case 'ParameterSet'
+            k=k+2;  % already processed
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -116,11 +157,16 @@ header = ioReadWavHeader(Filename);  % Get header information
 handle = fopen(Filename, 'rb', 'l'); % open audio data
 
 % end of file time in s
-eof_s = header.Chunks{header.dataChunk}.nSamples / header.fs;
+eof_s = sum(header.xhd.byte_length / ...
+    (header.nch * header.samp.byte))/header.fs;
+
+% Compute the start time of the last possible start frame given
+% the current framing parameters.  Compute the last possible
+% start position that will result in a full frame.
+lastframe_s = floor((eof_s-Length_s)/Advance_s)*Advance_s;
+
 % Frame parameters in samples
-Length_s = Length_ms / 1000;
 Length_samples = round(header.fs * Length_s);
-Advance_s = Advance_ms / 1000;
 Advance_samples = round(header.fs * Advance_s);
 
 Nyquist_bin = floor(Length_samples/2);
@@ -159,7 +205,7 @@ Performance.all = initPerformance();
 Performance.snr = initPerformance();  
 Performance.file = Filename;
 
-block_s = 5;  % desired processing block size
+block_s = thr.blocklen_s;  % processing block length
 
 % indicator showing which ground truth tonals have been processed
 gt_processedI = zeros(gtN, 1);  
@@ -167,7 +213,8 @@ gt_processedI = zeros(gtN, 1);
 gt_times = zeros(gtN, 2);
 for k=1:gtN
     t = ground_truth_tonals.get(k-1).get_time();
-    gt_times(k, :) = [t(1), t(end)];
+    % For search purposes, we consider between the 
+    gt_times(k, :) = [t(1), min(t(end), lastframe_s)];
 end
 
 falsePos = detected_tonals.clone();
@@ -218,9 +265,23 @@ while ~ done
         % process each ground truth tonal
         for gt_idx = find(process)'
             % find time bins corresponding to call
+            % Note:  Daniel had +/- quanterr_s padding on groundtruth
+            % times, but this causes problems for the mainline code.
+            % TODO:  Find other place to include padding on check
+            % of matchng tonals
             indices = find(t_idx >= gt_times(gt_idx, 1) & ...
                 t_idx <= gt_times(gt_idx, 2))';
             gt_tonal = ground_truth_tonals.get(gt_idx-1);
+            if gt_tonal.duration() < Advance_s
+                % tonal duration is less than the distance of a single
+                % frame.  We cannot process it with these parameters.
+                % Either the parameters are incorrect or there was an
+                % analyst error.  In any case, we will not try to match
+                % anything up to it.
+                gt_processedI(gt_idx) = true;  
+                continue  % skip
+            end
+
             t = gt_tonal.get_time();
             f = gt_tonal.get_freq();
             [t2, tindices] = unique(t, 'first');
@@ -232,36 +293,51 @@ while ~ done
             end
             % interpolate frequencies to current time resolution
             f_i = interp1(t, f, t_idx(indices));
-            % quantize frequency 
+            % quantize frequency
             f_q = round(f_i / bin_Hz) - thr.low_cutoff_bins + 1;
-            % ground truth was smoothed and peak SNR may not be 
+            
+            % ground truth was smoothed and peak SNR may not be
             % directly on path. Create matrix to search for max within
             % +/- search_bins on frequency axis
             snr = zeros(1, length(indices));
             search = round(PeakTolerance_Hz / bin_Hz);
             lowbins = f_q - search;
             highbins = f_q + search;
+            
+            % prevent search from running off spectrogram
+            % Overfit splines can exhibit large excursions that can
+            % easily exceed the analaysis range.  Hopefully, the 
+            % analyst was careful, but this will allows us to process
+            % such excursions without an indexing error.
             lowbins(lowbins < 1) = 1;
             lowbins(lowbins > range_binsN) = range_binsN;
             highbins(highbins < 1) = 1;
             highbins(highbins > range_binsN) = range_binsN;
+            
+            % Find strongest peaks within search range.
             for k=1:length(indices)
                 snr(k) = max(spec_dB(lowbins(k):highbins(k), indices(k)));
             end
             sorted_snr = sort(snr);
             gt_snr = sorted_snr(max(1,round((1-RatioAbove_SNR)*length(snr))));
-            valid = gt_snr > SNR_dB  && gt_tonal.duration() >= thr.minlen_ms / 1000;
-                
+            
+            % Are we expecting that the detection algorithm should
+            % be able to detect this tonal?
+            valid = gt_snr > SNR_dB  && gt_tonal.duration() >= thr.minlen_ms / ms_per_s;
+            
             % find overlapping detections
             deviations = [];
             matchedP = false;
             excess_t = 0;
             covered_t = 0;
             % We consider tonals that have already been matched as
-            % we may have merged two accidentally.
+            % two whistles may have been reported as a single detection.
+            % While the detection will only be counted once with respect
+            % to precision, each of the ground truth whistles will be
+            % counted as having been detected.
             overlap = gt_tonal.overlapping_tonals(detected_tonals);
             
-            % process overlaps
+            % process overlapping detections
             overlap_it = overlap.iterator();
             while (overlap_it.hasNext())
                 d = overlap_it.next();
@@ -287,6 +363,11 @@ while ~ done
                     end
                     
                     % save statistics
+                    % Note:  If multiple detections cover the same
+                    % interval, they will both contribute to the coverage
+                    % statistic.  This should be addressed in a future
+                    % release.  It did not appear to be a major problem
+                    % in Silbido (Roch et al. 2011).
                     deviations = [deviations; deviation];
                     excess_t = max(0, t(1)-dt(1)) + max(0, dt(end)-t(end));
                     covered_t = covered_t + t_ov(end) - t_ov(1);
