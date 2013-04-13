@@ -21,5 +21,5 @@ for i=1:size(test_files,1)
     fprintf('Completed.\n');
 end
 
-results = scoreall('.det', '/Users/michael/development/sdsu/silbido/corpora/paper_files/', [output_dir '/score.txt'], output_dir);
+results = scoreall('.det', base_dir, [output_dir '/score.txt'], output_dir);
 dtAnalyzeResults(results);

@@ -113,10 +113,12 @@ thr.broadband = .01;
 % When extracting tonals from a subgraph, use up to thr.disambiguate_s
 % when computing the local polynomial fit.
 thr.disambiguate_s = .3;  
+thr.advance_ms = 2;
+thr.length_ms = 8;
+thr.blocklen_s = 3;
 
 % Other defaults ------------------------------------------------------
-Advance_ms = 2;
-Length_ms = 8;
+%NoiseSub = {'median'};          % what type of noise compensation
 NoiseSub = 'median';          % what type of noise compensation
 MovieFile = [];      % generate a movie
 GraphFile = [];      % Save graphs to file
@@ -132,8 +134,8 @@ while k <= length(varargin)
                 error('Silbido:Framing', ...
                     '%s must be [Advance_ms, Length_ms]', varargin{k});
             else
-                Advance_ms = varargin{k+1}(1);
-                Length_ms = varargin{k+1}(2);
+                thr.advance_ms = varargin{k+1}(1);
+                thr.length_ms = varargin{k+1}(2);
             end
             k=k+2;
         case 'Interactive'
@@ -148,6 +150,9 @@ while k <= length(varargin)
             thr.activeset_s = varargin{k+1}; k=k+2;
         case 'Noise'
             NoiseSub = varargin{k+1}; k=k+2;
+            if ~ iscell(NoiseSub)
+                NoiseSub = {NoiseSub};
+            end
         case 'Movie'
             MovieFile = varargin{k+1}; k=k+2;
         case 'Range'
@@ -223,10 +228,15 @@ end
 
 % Derived Thresholds --------------------------------------------------
 thr.minlen_s = thr.minlen_ms / 1000;
-thr.minlen_frames = thr.minlen_ms / Advance_ms;                                         
+thr.minlen_frames = thr.minlen_ms / thr.advance_ms;                                         
 thr.maxgap_s = thr.maxgap_ms / 1000;
-thr.maxgap_frames = round(thr.maxgap_ms / Advance_ms);
+thr.maxgap_frames = round(thr.maxgap_ms / thr.advance_ms);
+% New peak is added to the existing peak in the orphan set if the gap
+% between them is less then thr.maxspace_s. Or else new peak is added to 
+% the orphan set.
+thr.maxspace_s = 2 * (thr.advance_ms / 1000);
 
+resolutionHz = (1000 / thr.length_ms);
 % Sets for managing search --------------------------------------------
 
 % active_set - When looking examining peak energies from the current
@@ -236,7 +246,7 @@ active_set = ActiveSet();
 
 % Start processing ----------------------------------------------------
 
-block_len_s = 3;  % amount of data considered in each block
+block_len_s = thr.blocklen_s;  % amount of data considered in each block
 
 % add outer loop to handle multiple filenames
 file_idx = 1;
@@ -292,9 +302,9 @@ end
 channel = channelmap(header, Filenames{file_idx});
 
 % Frame length and advance in samples
-Length_s = Length_ms / 1000;
+Length_s = thr.length_ms / 1000;
 Length_samples = round(header.fs * Length_s);
-Advance_s = Advance_ms / 1000;
+Advance_s = thr.advance_ms / 1000;
 Advance_samples = round(header.fs * Advance_s);
 window = hamming(Length_samples);
 Nyquist_bin = floor(Length_samples/2);
@@ -548,7 +558,6 @@ stopwatch = tic;
 tonals = java.util.LinkedList(); % Detected tonals
 discarded_count = 0;
 it = active_set.subgraphs.iterator();
-resolutionHz = (1000 / Length_ms);
 while it.hasNext()
             toneset = it.next();
                                         
