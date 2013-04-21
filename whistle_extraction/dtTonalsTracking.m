@@ -369,12 +369,59 @@ while StartBlock_s + 2 * Length_s < Stop_s
    Signal = ioReadWav(handle, header, StartBlock_s, StopBlock_s, ...
        'Units', 's', 'Channels', channel);
    % Perform spectral analysis on block
-   [snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
+   [power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
        Length_samples, Advance_samples, shift_samples, ...
        range_bins, thr.broadband * range_binsN, ...
        thr.click_dB, NoiseSub);
    
+    [filtered_spectrogram, mask] = CalculateFilter(power_dB, 10, 0, 1, 0, 1, 1, 1);
    
+    
+    figH = figure('Name', 'spectrogram');
+    silbidoH = subplot(2,1,1);
+    
+    dims = size(filtered_spectrogram);
+
+    % This is the width for the guassian derivative function.
+    % this is what the Ridge Track used.
+    guassian_width = 5;
+
+    % At the moment this is the struct that will store the angles
+    % and some processing flags.
+    functionals = struct;
+    functionals.angles = zeros(dims);
+    functionals.processed = zeros(dims, 'uint8');
+    functionals.computed = zeros(dims, 'uint8');
+    
+    functionals2 = struct;
+    functionals2.angles = zeros(dims);
+    functionals2.processed = zeros(dims, 'uint8');
+    functionals2.computed = zeros(dims, 'uint8');
+
+    % At the moment this holds the derivative infomration.  This
+    % is processed for the whole spectrogram at onece.  We possibly
+    % could do this lazily also.
+    derivatives = struct;
+    derivatives.gx=gfilter(filtered_spectrogram,guassian_width,[0 1]);
+    derivatives.gy=gfilter(filtered_spectrogram,guassian_width,[1 0]);
+    derivatives.gxx=gfilter(filtered_spectrogram,guassian_width,[0 2]);
+    derivatives.gyy=gfilter(filtered_spectrogram,guassian_width,[2 0]);
+    derivatives.gxy=gfilter(filtered_spectrogram,guassian_width,[2 2]);
+    derivatives.gyx=derivatives.gxy;
+   
+    imagesc(snr_power_dB);
+    set(gca,'YDir','normal');
+    colormap(gray);
+    hold on;
+    
+    subplot(2,1,2);
+    ridgesH = imagesc(filtered_spectrogram);
+    set(gca,'YDir','normal');
+    colormap(gray);
+    hold on;
+    
+    all_ha = findobj( figH, 'type', 'axes', 'tag', '' );
+    linkaxes( all_ha, 'xy' );
    
    % relative to file rather than block
    Indices.timeidx = Indices.timeidx + StartBlock_s;
@@ -384,6 +431,8 @@ while StartBlock_s + 2 * Length_s < Stop_s
    phaseO = zeros(size(snr_power_dB, 1), 2);
    
    active_set.debug = false;
+   forward_ridge_tracking = cell(1,size(snr_power_dB, 2));
+   
    for frame_idx = 1:size(snr_power_dB, 2)              
        
        % determine current time
@@ -415,6 +464,7 @@ while StartBlock_s + 2 * Length_s < Stop_s
                peak(too_close + maxidx - 1) = [];
            end
        end
+       
 
        peakN = length(peak);
        if ~ isempty(peak)
@@ -435,29 +485,45 @@ while StartBlock_s + 2 * Length_s < Stop_s
            
            peakN_last_processed = peakN;
            peak_freq = (peak - 1)* bin_Hz + OffsetHz;
-                   
-           % gathering information for phase derivatives
-           % Take short-time Fourier transforms of signal in neighborhood
-           % of the original transform
-           if false
-               dft_idx = 1;
-               for delta = [-shift_samples shift_samples]
-                   % compute phase shift
-                   samp = Indices.idx(frame_idx,:) + delta;
-                   dft2(:, dft_idx) = fft(Signal(samp(1):samp(2)).*window);
-                   phaseO(:, dft_idx) = angle(dft2(range_bins, dft_idx));
-                   
-                   dft_idx = dft_idx + 1;
+           
+           ridge_peaks = forward_ridge_tracking{frame_idx};
+                 
+           
+           for ind=1:size(peak,2)
+               p = peak(ind);
+               skip_peak = 0;
+               for r_idx=1:length(ridge_peaks)
+                   if abs(ridge_peaks(r_idx) - p) <= 2
+                       skip_peak = 1;
+                   end
                end
-               % estimate derivates, but only bother doing it for peaks
-               % Takes into account the phase change due to framing and
-               % does not include it in the derivative estimate.
-               d_frame = shift_samples/header.fs * peak_freq' * TwoPi;
-               pkangle = angle(dft(peak, frame_idx));
-               dphase1 = pkangle - d_frame - phaseO(peak, 1);
-               dphase2 = phaseO(peak, 2) - d_frame - pkangle;
-               dphase = (dphase1 + dphase2) / 2;
-               ddphase = dphase2 - dphase1;
+               
+               if skip_peak == 1
+                   plot(silbidoH, frame_idx, p, 'r', 'LineWidth', 2);
+                   continue;                   
+               end            
+               
+               [ridge,functionals2]=TrackRidge(functionals2, derivatives,frame_idx,p,1);
+               if( size(ridge,1) > 1)
+                   plot(ridge(:,1), ridge(:,2), 'y', 'LineWidth', 2);
+                   plot(frame_idx, p, 'g', 'LineWidth', 3);
+                   plot(ridge(end,1), ridge(end,2), 'r', 'LineWidth', 3);
+                   
+                   plot(silbidoH, frame_idx, p, 'g', 'LineWidth', 2);
+               else
+                   plot(frame_idx, p, 'c', 'LineWidth', 2);
+                   plot(silbidoH, frame_idx, p, 'c', 'LineWidth', 2);
+               end
+               
+               for rIdx=2:size(ridge,1)
+                   ridge_value = ridge(rIdx,:);
+                   cell_ind = round(ridge_value(1));
+                   slice_vector = forward_ridge_tracking{cell_ind};
+                   slice_vector = [slice_vector ridge_value(2)];
+                   forward_ridge_tracking{cell_ind} = slice_vector;
+               end
+               
+               drawnow;
            end
            
            % examine active list and see if anything needs to be removed
