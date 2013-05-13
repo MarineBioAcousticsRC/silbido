@@ -210,7 +210,7 @@ else
 end
 
 framesN = size(snr_power_dB, 2);  % total # of frames
-if stop_pad >= 0
+if stop_pad > 0
     start_of_end_idx = round(max(0, stop - stop_pad - start)/Advance_s);
     stopRange = [start_of_end_idx:Indices.FrameCount];
 else

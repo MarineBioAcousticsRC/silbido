@@ -68,7 +68,7 @@ function [dd, functionals]=process_point(functionals,derivatives,x,y,ddold, forw
 % circle.
 
 % This is where the hessian functional is comupted if it has not been.
-% This is where the lazy calculation happens.
+% This is where the lazy calculation happens.    
 
 if (forward_only == 1)
     x_start = x;

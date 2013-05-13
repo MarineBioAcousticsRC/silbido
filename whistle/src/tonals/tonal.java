@@ -48,7 +48,8 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
 		// Create a tonal given arrays time and frequency.
 		super();
 		for (int i=0; i < time.length; i++) 
-			this.add(tfnode.create(time[i], freq[i], 0.0, 0.0));
+			// FIXME ridge
+			this.add(tfnode.create(time[i], freq[i], 0.0, 0.0, false));
 	}
 	
 	// 
@@ -101,7 +102,8 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
 				while (N > 0) {
 					time = istream.readDouble();
 					freq = istream.readDouble();
-					tfnodes.add(new tfnode(time, freq, 0.0, 0.0));
+					// FIXME ridge
+					tfnodes.add(new tfnode(time, freq, 0.0, 0.0, false));
 					N--;
 				}
 				t = new tonal(tfnodes);
@@ -178,25 +180,27 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
 			phase[i] = get(i).phase;
 		return phase;
 	}
-
-//	public double[] get_dphase() {
-//		/* Return 1st derivative of phase associated with this tonal */
-//		int n = size();
-//		double[] dphase = new double[n];
-//		for (int i=0; i < n; i++)
-//			dphase[i] = get(i).dphase;
-//		return dphase;
-//	}
-
-//	public double[] get_ddphase() {
-//		/* Return 2nd derivative of phase associated with this tonal */
-//		int n = size();
-//		double[] ddphase = new double[n];
-//		for (int i=0; i < n; i++)
-//			ddphase[i] = get(i).ddphase;
-//		return ddphase;
-//	}
-
+	
+	public int[] get_ridge() {
+		/* Return times associated with this tonal */
+		int n = size();
+		int[] ridge = new int[n];
+		for (int i=0; i < n; i++)
+			ridge[i] = get(i).ridge?1:0;
+		return ridge;
+	}
+	
+	public double getPercentRidgeSupported() {
+		int count = 0;
+		int n = size();
+		for (int i=0; i < n; i++) {
+			if (get(i).ridge) {
+				count++;
+			}
+		}
+		return (double)count/(double)n;
+	}
+	
 	
 	/* ================================================ */
 
@@ -685,6 +689,15 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
     	
     	return str.toString();
     }
+    
+    public String toRidgeSupprtString() {
+		StringBuilder builder = new StringBuilder();
+		Iterator<tfnode> i = iterator();
+		while (i.hasNext()) {
+			builder.append(i.next().ridge?"1":"0");
+		}
+		return builder.toString();
+	}
 
 	public double duration() {
 		return Math.abs(this.getFirst().time - this.getLast().time);

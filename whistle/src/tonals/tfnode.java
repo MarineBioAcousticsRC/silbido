@@ -18,6 +18,9 @@ public class tfnode implements Comparable<tfnode>, Serializable
     public double freq;
     public double snr;  // signal to noise ratio dB re noise floor
     public double phase;
+    public boolean ridge;
+    public int distFromRidge;
+    
     //public double dphase;  // derivative of phase
     //public double ddphase; // 2nd derivative of phase
 
@@ -47,22 +50,21 @@ public class tfnode implements Comparable<tfnode>, Serializable
      */
     //* @param dphase - estimate of phase derivative
     //* @param ddphase - estimate of 2nd derivative of phase
-    static public tfnode create(double time, double freq, double snr, double phase)
+    static public tfnode create(double time, double freq, double snr, double phase, boolean ridge)
     	//double dphase, double ddphase) {
     {
-    	
     	tfnode node;
     	if (free_list != null) {
     		// Reuse the first existing node on the free list. 
     		node = free_list;
     		free_list = node.next_free;
     		
-    		node.init_common(time, freq, snr, phase); //, dphase, ddphase);
+    		node.init_common(time, freq, snr, phase, ridge); //, dphase, ddphase);
     		// clear out the linked lists
     		node.predecessors.clear();
     		node.successors.clear();
     	} else {
-    		node = new tfnode(time, freq, snr, phase); //, dphase, ddphase);
+    		node = new tfnode(time, freq, snr, phase, ridge); //, dphase, ddphase);
     	}
     	return node;
     }
@@ -87,10 +89,10 @@ public class tfnode implements Comparable<tfnode>, Serializable
      * @param ddphase - estimate of 2nd derivative of phase
      */
     
-    public tfnode(double time, double freq, double snr, double phase) 
+    public tfnode(double time, double freq, double snr, double phase, boolean ridge) 
     		//double dphase, double ddphase)
     {
-    	init_common(time, freq, snr, phase); //, dphase, ddphase);
+    	init_common(time, freq, snr, phase, ridge); //, dphase, ddphase);
     	/* linked lists serve as edges in the graph between nodes */
     	predecessors = new LinkedList<tfnode>();
     	successors = new LinkedList<tfnode>();
@@ -99,7 +101,7 @@ public class tfnode implements Comparable<tfnode>, Serializable
 
     /* tfnode - no args */
     public tfnode() {
-    	init_common(0.0, 0.0, 0.0, 0.0); // 0.0, 0.0);
+    	init_common(0.0, 0.0, 0.0, 0.0, false); // 0.0, 0.0);
     	predecessors = new LinkedList<tfnode>();
     	successors = new LinkedList<tfnode>();
 	}
@@ -113,7 +115,7 @@ public class tfnode implements Comparable<tfnode>, Serializable
      * @param ddphase - estimate of 2nd derivative of phase
      */
     private void init_common(double time, double freq, double snr, 
-    		double phase) //double dphase, double ddphase)
+    		double phase, boolean ridge) //double dphase, double ddphase)
     {
     	next_free = null;
     	
@@ -121,11 +123,18 @@ public class tfnode implements Comparable<tfnode>, Serializable
     	this.time = time;
     	this.freq = freq;
     	this.phase = phase;
+    	this.ridge = ridge;
     	//this.dphase = dphase;
     	//this.ddphase = ddphase;
     	
     	earliest_pred = time;  /* currently no predecessors */       	
     	set_root = this;  /* starts in its own set */
+    	
+    	if (ridge) {
+    		distFromRidge = 0;
+    	} else {
+    		distFromRidge = Integer.MAX_VALUE;
+    	}
     }
     
     public tfnode find() {

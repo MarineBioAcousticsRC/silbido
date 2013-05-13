@@ -148,7 +148,7 @@ public class TonalBinaryInputStream {
 						snr = datastream.readDouble();
 					if ((fbit_mask & TonalHeader.PHASE) != 0)
 						phase = datastream.readDouble();
-					tfnodes.add(new tfnode(time, freq, snr, phase));
+					tfnodes.add(new tfnode(time, freq, snr, phase, false));
 					N--;			
 				}
 				t = new tonal(tfnodes);

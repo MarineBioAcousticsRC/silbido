@@ -322,6 +322,7 @@ public class graph {
 		// and nodes are shared.
 		graph copy = new graph(this);
 		copy.compress(disamb_thr_s, resolutionHz, fit_dphase, fit_vecstr);
+		copy.process_bridges();
 		return copy;
 	}
 	
@@ -1036,6 +1037,86 @@ public class graph {
 	 */
 	public int node_count() {
 		return in.size();
+	}
+	
+	public void process_bridges() {
+		LinkedList<edge<tfnode, tonal>> outgoing;
+		tfnode currentNode = null;
+		
+		boolean modified = false;
+		
+		for (tfnode inNode : in.keySet()) {
+			outgoing = out.get(inNode);
+			if (outgoing.size()==0)
+				continue;
+			else if (outgoing.size() > 1) {
+				//System.out.println("Node has more than one outgoing edges: " + inNode);
+				continue;
+			}
+			
+			edge<tfnode,tonal> edge = outgoing.get(0);
+			tonal t = edge.content;
+				
+			//System.out.println("Edge" + edge + "is " + t.getPercentRidgeSupported());
+			if (t.getPercentRidgeSupported() < .01) {
+				System.out.println("Edge" + edge + "is removed: " + t.getPercentRidgeSupported());
+				remove_edge(edge);
+			}
+			// now find and evaluate bridges
+			//HashSet<BridgeIndicies> bridgeIndicies = new HashSet<BridgeIndicies>();
+			
+			int i = 0;
+			while(i < t.size() && false){
+				currentNode = t.get(i);
+				if (currentNode.ridge) {
+					i++;
+					continue;
+				}
+				
+				//First non-ridge node;
+				int bridgeStart = i;
+				int bridgeEnd = i;
+				i++;
+				if (i == t.size() ) {
+					// end of the list
+					bridgeEnd = i - 1;
+					
+				} else {
+					currentNode = t.get(i);
+					while(!currentNode.ridge) {
+						i++;
+						if (i<t.size()) {
+							currentNode = t.get(i);
+						} else {
+							break;
+						}
+					}
+					
+					// The bridge ended one index ago, either because we
+					// it a ridge node or because we went off of the tonal.
+					bridgeEnd = i - 1;
+				}
+				
+				BridgeResult bridgeResult = evalute_bridge(t,bridgeStart,bridgeEnd);
+				if(bridgeResult.modified) {
+					// do stuff.
+				}
+			}
+		}
+		
+	}
+	
+	private class BridgeResult{
+		boolean modified = false;
+		edge<tfnode, tonal> leftEdge;
+		edge<tfnode, tonal> rightEdge;
+		int nextIndex;
+	}
+	
+	
+	
+	private BridgeResult evalute_bridge(tonal tonal, int bridgeStart, int bridgeEnd) {
+		return new BridgeResult();
 	}
 	
 	/*

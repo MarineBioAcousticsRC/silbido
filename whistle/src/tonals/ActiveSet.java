@@ -32,7 +32,7 @@ public class ActiveSet extends tfTreeSet {
 	 * TODO:  Write docs
 	 */
 	public ActiveSet() {
-		first = new tfnode(0, 0, 0, 0);  // used to search peak list
+		first = new tfnode(0, 0, 0, 0, false);  // used to search peak list
 		subgraphs = new LinkedList<graph>();  // completed subgraphs
 		discards= new LinkedList<graph>();  // discarded subgraphs (debug)
 		orphans = new tfTreeSet();

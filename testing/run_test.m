@@ -4,8 +4,9 @@ if (~exist('dtTonalsSave'))
     dev_init;
 end
 
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/filter_test/';
-base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
+base_dir = '/Users/michael/development/sdsu/silbido/corpora/filter_test/';
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/short-test/';
 output_dir = 'testing/results/';
 test_files = getAllFiles(base_dir, '.wav');
 

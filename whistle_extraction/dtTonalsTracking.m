@@ -174,6 +174,8 @@ while k <= length(varargin)
             TonalFile = varargin{k+1}; k=k+2;
         case 'GraphFile'
             GraphFile = varargin{k+1}; k=k+2;
+       case 'SPCallback'
+            SPCallback = varargin{k+1}; k=k+2;
         case 'WaitTimeRejection'
             if length(varargin{k+1}) ~= 3
                 error('%s expecting [N_events, wait_s, maxdur_s]', ...
@@ -374,11 +376,8 @@ while StartBlock_s + 2 * Length_s < Stop_s
        range_bins, thr.broadband * range_binsN, ...
        thr.click_dB, NoiseSub);
    
-    [filtered_spectrogram, mask] = CalculateFilter(power_dB, 10, 0, 1, 0, 1, 1, 1);
+    [filtered_spectrogram, mask] = CalculateFilter(snr_power_dB, 10, 0, 1, 0, 1, 1, 1);
    
-    
-    figH = figure('Name', 'spectrogram');
-    silbidoH = subplot(2,1,1);
     
     dims = size(filtered_spectrogram);
 
@@ -392,11 +391,6 @@ while StartBlock_s + 2 * Length_s < Stop_s
     functionals.angles = zeros(dims);
     functionals.processed = zeros(dims, 'uint8');
     functionals.computed = zeros(dims, 'uint8');
-    
-    functionals2 = struct;
-    functionals2.angles = zeros(dims);
-    functionals2.processed = zeros(dims, 'uint8');
-    functionals2.computed = zeros(dims, 'uint8');
 
     % At the moment this holds the derivative infomration.  This
     % is processed for the whole spectrogram at onece.  We possibly
@@ -409,26 +403,12 @@ while StartBlock_s + 2 * Length_s < Stop_s
     derivatives.gxy=gfilter(filtered_spectrogram,guassian_width,[2 2]);
     derivatives.gyx=derivatives.gxy;
    
-    imagesc(snr_power_dB);
-    set(gca,'YDir','normal');
-    colormap(gray);
-    hold on;
-    
-    subplot(2,1,2);
-    ridgesH = imagesc(filtered_spectrogram);
-    set(gca,'YDir','normal');
-    colormap(gray);
-    hold on;
-    
-    all_ha = findobj( figH, 'type', 'axes', 'tag', '' );
-    linkaxes( all_ha, 'xy' );
+    if (exist('SPCallback', 'var'))
+        SPCallback.new_block(snr_power_dB,filtered_spectrogram);
+    end
    
    % relative to file rather than block
    Indices.timeidx = Indices.timeidx + StartBlock_s;
-
-   % Reserve memory for dfts used in derivative estimation
-   dft2 = zeros(Length_samples, 2);
-   phaseO = zeros(size(snr_power_dB, 1), 2);
    
    active_set.debug = false;
    forward_ridge_tracking = cell(1,size(snr_power_dB, 2));
@@ -484,37 +464,44 @@ while StartBlock_s + 2 * Length_s < Stop_s
            
            
            peakN_last_processed = peakN;
-           peak_freq = (peak - 1)* bin_Hz + OffsetHz;
            
            ridge_peaks = forward_ridge_tracking{frame_idx};
-                 
+           ridge_peaks_num = length(ridge_peaks);
+           ridge_peaks_to_omit = zeros(1,ridge_peaks_num);
+           ridge_supported_peaks = zeros(1,length(peak));
            
            for ind=1:size(peak,2)
                p = peak(ind);
-               skip_peak = 0;
+               ridge_supported = 0;
+               
                for r_idx=1:length(ridge_peaks)
-                   if abs(ridge_peaks(r_idx) - p) <= 2
-                       skip_peak = 1;
+                   if abs(round(ridge_peaks(r_idx)) - p) <= 2;
+                       ridge_supported = 1;
+                       ridge_peaks_to_omit(r_idx) = 1;
+                       break;
                    end
                end
                
-               if skip_peak == 1
-                   plot(silbidoH, frame_idx, p, 'r', 'LineWidth', 2);
+               if ridge_supported == 1
+                   ridge_supported_peaks(ind) = 1;
+                   if (exist('SPCallback', 'var'))
+                       SPCallback.handle_ridge_peak(frame_idx,p);
+                   end
                    continue;                   
-               end            
-               
-               [ridge,functionals2]=TrackRidge(functionals2, derivatives,frame_idx,p,1);
-               if( size(ridge,1) > 1)
-                   plot(ridge(:,1), ridge(:,2), 'y', 'LineWidth', 2);
-                   plot(frame_idx, p, 'g', 'LineWidth', 3);
-                   plot(ridge(end,1), ridge(end,2), 'r', 'LineWidth', 3);
-                   
-                   plot(silbidoH, frame_idx, p, 'g', 'LineWidth', 2);
-               else
-                   plot(frame_idx, p, 'c', 'LineWidth', 2);
-                   plot(silbidoH, frame_idx, p, 'c', 'LineWidth', 2);
                end
                
+               % The peak is not part of a ridge, so go ahead and track a
+               % new ridge from here.
+               [ridge,functionals] = TrackRidge(functionals, derivatives,frame_idx,p,1);
+               
+               if (size(ridge,1) < 25)
+                   ridge = [];
+               end
+               
+               if (size(ridge,1) > 1)
+                   ridge_supported_peaks(ind) = 1;
+               end
+                  
                for rIdx=2:size(ridge,1)
                    ridge_value = ridge(rIdx,:);
                    cell_ind = round(ridge_value(1));
@@ -522,9 +509,16 @@ while StartBlock_s + 2 * Length_s < Stop_s
                    slice_vector = [slice_vector ridge_value(2)];
                    forward_ridge_tracking{cell_ind} = slice_vector;
                end
-               
-               drawnow;
+               if (exist('SPCallback', 'var'))
+                   SPCallback.handle_non_ridge_peak(frame_idx,p, ridge);
+               end
            end
+           
+           %ridge_peaks_to_keep = round(ridge_peaks(find(ridge_peaks_to_omit==0)));
+           %peak = [peak ridge_peaks_to_keep];
+           %ridge_supported_peaks = [ridge_supported_peaks ones(1,length(ridge_peaks_to_keep))];
+           
+           peak_freq = (peak - 1)* bin_Hz + OffsetHz;
            
            % examine active list and see if anything needs to be removed
            % or moved to the list of whistles
@@ -532,68 +526,14 @@ while StartBlock_s + 2 * Length_s < Stop_s
 
            % Create TreeSet of time-frequency nodes for peaks
            peak_list = tfTreeSet(current_s(ones(size(peak))), ...
-               peak_freq, smoothed_dB(peak), angle(dft(peak, frame_idx)));
-           %, , dphase, ddphase);
-           % something new to process - display if needed
-           if Plot > 0
-               if ~ isempty(handles)
-                   delete(handles{:});     % remove plots from last iteration
-                   clear handles;
-               end
-               handles{1} = plot(peak_list.get_time(), ...
-                   peak_list.get_freq/1000, 'r^');
-               handles{2} = plot(active_set.get_time(), ...
-                   active_set.get_freq/1000, 'bp');
-               if Plot > 2
-                   handles{3} = plot(active_set.orphans.get_time(), ...
-                       active_set.orphans.get_freq/1000, 'ko');
-               end
-           end
-           
+               peak_freq, smoothed_dB(peak), angle(dft(peak, frame_idx)), ridge_supported_peaks);
+                    
            % Link anything possible from the current active set to the
            % new peaks then add them to the active set.            
            active_set.extend(peak_list, thr.maxslope_Hz_per_ms, thr.activeset_s);
-           
-           if Plot > 1
-               % plot subgraphs associated with the active and orphan sets
-               seen = [];
-               [handles, coloridx] = plot_graph(active_set, ...
-                   handles, cmap, coloridx, ':', 'd');
-               if Plot > 2
-                   [handles, coloridx] = plot_graph(active_set.orphans, ...
-                       handles, cmap, coloridx, ':', 'o');
-               end
+ 
+       end
 
-               % Plot 
-               % Check for any new subgraphs as a result of pruning
-               prev_closed = subgraphs_closed;
-               subgraphs_closed = active_set.subgraphs.size();
-               if  subgraphs_closed > prev_closed
-                   plotted = true;
-                   % plot out the new closed off subgraphs
-                   % we don't save their handles as we aren't
-                   % planning on deleting them (yet at least)
-                   for k = prev_closed:(subgraphs_closed-1)
-                       g = active_set.subgraphs.get(k);
-                       dtPlotGraph(g, ...
-                               'ColorMap', cmap, 'LineStyle', '-', ...
-                               'ColorIdx', coloridx, 'Marker', 'x', ...
-                               'DistinguishEdges', false);
-                   end
-               end               
-           end
-       end
-       if Plot > 0
-           if ~ isempty(MovieH)
-               FrameH = getframe(MovieFig, MoviePosition);
-               MovieH = addframe(MovieH, FrameH);
-           end
-           if Interactive
-               pause
-           else
-               drawnow;
-           end
-       end
    end % end for frame_idx
    
    StartBlock_s = Indices.timeidx(end) + Advance_s - shift_samples_s;  % Set time for next block

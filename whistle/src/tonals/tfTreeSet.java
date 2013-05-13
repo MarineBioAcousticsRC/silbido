@@ -9,7 +9,7 @@ public class tfTreeSet extends TreeSet<tfnode> {
 	static final long serialVersionUID = 0;
 
 	public tfTreeSet(double[] time, double[] freq, double[] snr,
-			double[] phase) {
+			double[] phase, int[] ridge) {
 		//, double[] dphase, double[] ddphase) {
 
 		/* Create a set of tfnodes given arrays time, freq, 
@@ -18,7 +18,7 @@ public class tfTreeSet extends TreeSet<tfnode> {
     	
     	/* todo - add exception for bad lengths */
     	for (int i=0; i < time.length; i++)
-    		this.add(tfnode.create(time[i], freq[i], snr[i], phase[i]));
+    		this.add(tfnode.create(time[i], freq[i], snr[i], phase[i], ridge[i]==1));
     				//dphase[i], ddphase[i]));
     }
     

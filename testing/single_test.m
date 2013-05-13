@@ -1,24 +1,6 @@
-addpath('/Users/michael/development/sdsu/silbido/matlab-src/utils');
-
-if (~exist('dtTonalsSave'))
-    dev_init;
-end
-
-
-
-
-    input_file = 'testing/test.wav';
-    output_dir = 'testing/';
-    base_dir = 'testing/';
-    [path, name, ~] = fileparts(input_file);
-    rel_path = path(size(base_dir,2)+1:end);
-    output_file = fullfile(output_dir,rel_path,strcat(name, '.det'));
-
-    fprintf('Tracking Tonals for file %s ...', input_file);
-    tonals = dtTonalsTracking(input_file,0,Inf);
-    dtTonalsSave(output_file, tonals);
-    fprintf('Completed.\n');
-
-
-results = scoreall('.det', '/Users/michael/development/sdsu/silbido/corpora/paper_files/', [output_dir '/score.txt'], output_dir);
-dtAnalyzeResults(results);
+clear all;
+dev_init;
+callback = DTTonalsTrackingCallback();
+[tonals, graphs] = dtTonalsTracking('/Users/michael/development/sdsu/silbido/corpora/filter_test/bottlenose/Qx-Tt-SCI0608-N1-060814-121518.wav',0,10, 'SPCallback', callback);
+%[tonals, graphs] = dtTonalsTracking('/Users/michael/development/sdsu/silbido/corpora/filter_test/bottlenose/Qx-Tt-SCI0608-N1-060814-121518.wav',0,Inf);
+%dtTonalsPlot('/Users/michael/development/sdsu/silbido/corpora/filter_test/bottlenose/Qx-Tt-SCI0608-N1-060814-121518.wav', tonals, graphs, 0, 10,'Framing', [2, 8], 'Plot', {'graph', 'tonal'});
