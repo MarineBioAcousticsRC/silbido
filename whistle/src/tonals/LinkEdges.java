@@ -1,7 +1,9 @@
 package tonals;
 
+import java.io.Serializable;
+
 // Incoming and outgoing edges with fitness score 
-public class LinkEdges {
+public class LinkEdges implements Serializable {
 	public edge<tfnode, tonal> in;
 	public edge<tfnode, tonal> out;
 	public double diff_dphase;

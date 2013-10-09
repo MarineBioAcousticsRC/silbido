@@ -68,6 +68,7 @@ public class TonalBinaryOutputStream {
 	 */
 	private void write_tonal(tonal t) {
 		try {
+			datastream.writeDouble(t.getGraphId());
 			datastream.writeInt(t.size());
 			// Write out desired items for each time bin
 			// Item order is important, do not change.
@@ -80,6 +81,8 @@ public class TonalBinaryOutputStream {
 					datastream.writeDouble(node.snr);
 				if ((hdr.bitMask & TonalHeader.PHASE) != 0)
 					datastream.writeDouble(node.phase);
+				if ((hdr.bitMask & TonalHeader.RIDGE) != 0)
+					datastream.writeBoolean(node.ridge);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();

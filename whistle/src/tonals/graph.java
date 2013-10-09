@@ -1,8 +1,14 @@
 package tonals;
 
-import java.util.*;
+import java.io.Serializable;
+import java.util.Formatter;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.PriorityQueue;
 
-public class graph {
+public class graph implements Serializable {
 	/*
 	 * Constructs a graph representing tonals.  
 	 * Paths without choice points are collapsed into a single edge,
@@ -24,6 +30,7 @@ public class graph {
 	private HashMap<tfnode, LinkedList<edge<tfnode, tonal>>> out;
 
 	public double resolutionHz;
+	public final double graphId;
 	
 	/*
 	 * Create a graph.
@@ -33,7 +40,9 @@ public class graph {
 	 * junction - 2 or more entries on the successor list,
 	 * 			the predecessor list, or both.
 	 */
-	public graph(tfnode n) {
+	public graph(tfnode n, double graphId) {
+		
+		this.graphId = graphId;
 		
 		// initialize edge list maps
 		in = new HashMap<tfnode, LinkedList<edge<tfnode, tonal>>>();
@@ -48,7 +57,8 @@ public class graph {
 	}
 	
 	// Create a new copy of a graph. This is a deep copy
-	public graph(graph other) {
+	public graph(graph other, double graphId) {
+		this.graphId = graphId;
 		
 		in = map_clone(other.in);
 		out = map_clone(other.out);
@@ -60,6 +70,10 @@ public class graph {
 		this.nodes_out = new LinkedList<tfnode>();
 		for (tfnode exit: other.nodes_out)
 			this.nodes_out.add(exit);
+	}
+	
+	public double getGraphId() {
+		return graphId;
 	}
 	
 	// Moderately deep copy
@@ -147,7 +161,7 @@ public class graph {
 	 * @param succ - node along the desired successor path
 	 */
 	tonal succ_path(tfnode first, tfnode succ) {
-		tonal path = new tonal();
+		tonal path = new tonal(this.graphId);
 		tfnode node = succ;
 		tfnode prev = first;
 		
@@ -316,13 +330,15 @@ public class graph {
 	}
 	
 	public graph disambiguate(double disamb_thr_s, double resolutionHz, 
-			boolean fit_dphase, boolean fit_vecstr) {
+			boolean fit_dphase, boolean fit_vecstr, boolean use_ridges, double ridge_thresh) {
 		// Create a moderately deep copy of this graph.
 		// The edge containers have fresh copies, but the edges
 		// and nodes are shared.
-		graph copy = new graph(this);
+		graph copy = new graph(this, this.graphId);
 		copy.compress(disamb_thr_s, resolutionHz, fit_dphase, fit_vecstr);
-		copy.process_bridges();
+		if (use_ridges) {
+			copy.process_bridges(ridge_thresh);
+		}
 		return copy;
 	}
 	
@@ -471,6 +487,7 @@ public class graph {
 									c.object.b.to, 
 									c.object.a.content.merge(
 											c.object.b.content));
+						c.object.a.to.fitError = c.score;
 						add_edge(new_edge);
 						// very verbose, we'll probably want to comment
 						// this out or put in a verbosity flag once
@@ -952,6 +969,17 @@ public class graph {
 		nodes_out.addAll(new_out);
 	}
 	
+	public boolean overlaps(double start_time, double end_time) {
+		LinkedList<edge<tfnode, tonal>> sorted = topological_sort();
+		for (edge<tfnode, tonal> edge : sorted) {
+			if ( (edge.from.time > start_time && edge.from.time < end_time) ||
+				 (edge.to.time > start_time && edge.to.time < end_time)	) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
 	@SuppressWarnings("unchecked")
 	public LinkedList<edge<tfnode, tonal>> topological_sort() {
 		/* Returns collection of edges in topological order */
@@ -1039,7 +1067,7 @@ public class graph {
 		return in.size();
 	}
 	
-	public void process_bridges() {
+	public void process_bridges(double ridge_thresh) {
 		LinkedList<edge<tfnode, tonal>> outgoing;
 		tfnode currentNode = null;
 		
@@ -1058,53 +1086,54 @@ public class graph {
 			tonal t = edge.content;
 				
 			//System.out.println("Edge" + edge + "is " + t.getPercentRidgeSupported());
-			if (t.getPercentRidgeSupported() < .01) {
-				System.out.println("Edge" + edge + "is removed: " + t.getPercentRidgeSupported());
+			if (t.getPercentRidgeSupported() < ridge_thresh) {
+				//System.out.println("Edge" + edge + "is removed: " + t.getPercentRidgeSupported());
 				remove_edge(edge);
 			}
 			// now find and evaluate bridges
 			//HashSet<BridgeIndicies> bridgeIndicies = new HashSet<BridgeIndicies>();
 			
-			int i = 0;
-			while(i < t.size() && false){
-				currentNode = t.get(i);
-				if (currentNode.ridge) {
-					i++;
-					continue;
-				}
-				
-				//First non-ridge node;
-				int bridgeStart = i;
-				int bridgeEnd = i;
-				i++;
-				if (i == t.size() ) {
-					// end of the list
-					bridgeEnd = i - 1;
-					
-				} else {
-					currentNode = t.get(i);
-					while(!currentNode.ridge) {
-						i++;
-						if (i<t.size()) {
-							currentNode = t.get(i);
-						} else {
-							break;
-						}
-					}
-					
-					// The bridge ended one index ago, either because we
-					// it a ridge node or because we went off of the tonal.
-					bridgeEnd = i - 1;
-				}
-				
-				BridgeResult bridgeResult = evalute_bridge(t,bridgeStart,bridgeEnd);
-				if(bridgeResult.modified) {
-					// do stuff.
-				}
-			}
+//			int i = 0;
+//			while(i < t.size()){
+//				currentNode = t.get(i);
+//				if (currentNode.ridge) {
+//					i++;
+//					continue;
+//				}
+//				
+//				//First non-ridge node;
+//				int bridgeStart = i;
+//				int bridgeEnd = i;
+//				i++;
+//				if (i == t.size() ) {
+//					// end of the list
+//					bridgeEnd = i - 1;
+//					
+//				} else {
+//					currentNode = t.get(i);
+//					while(!currentNode.ridge) {
+//						i++;
+//						if (i<t.size()) {
+//							currentNode = t.get(i);
+//						} else {
+//							break;
+//						}
+//					}
+//					
+//					// The bridge ended one index ago, either because we
+//					// it a ridge node or because we went off of the tonal.
+//					bridgeEnd = i - 1;
+//				}
+//				
+//				//BridgeResult bridgeResult = evalute_bridge(t,bridgeStart,bridgeEnd);
+//				//if(bridgeResult.modified) {
+//					// do stuff.
+//				//}
+//			}
 		}
-		
 	}
+	
+	
 	
 	private class BridgeResult{
 		boolean modified = false;
@@ -1116,8 +1145,60 @@ public class graph {
 	
 	
 	private BridgeResult evalute_bridge(tonal tonal, int bridgeStart, int bridgeEnd) {
+		System.out.println(
+			String.format(
+					"Bridge detected from %d to %d in tonal %s", bridgeStart, bridgeEnd, tonal.toString()));
+		// FIXME Better structure for holding distance outside of node.
+		int cutThresh = 5;
+		// Forward scan.
+		int distance = 0;
+		if (bridgeStart == 0) {
+			distance = Integer.MAX_VALUE;
+		}
+		
+		int rightCutPoint = -1;
+		int leftCutPoint = -1;
+		
+		for(int i = bridgeStart; i <= bridgeEnd; i++) {
+			if (distance < Integer.MAX_VALUE) {
+				distance++;
+			}
+			if (distance > cutThresh && leftCutPoint < 0) {
+				leftCutPoint = i;
+			}
+			tonal.get(i).distFromRidge = distance;
+		}
+		
+		
+		
+		// Backward scan
+		distance = 0;
+		if (bridgeEnd == tonal.size() - 1) {
+			distance = Integer.MAX_VALUE;
+		}
+		
+		for(int i = bridgeEnd; i >= bridgeStart; i--) {
+			tfnode node = tonal.get(i);
+			
+			if (distance < Integer.MAX_VALUE) {
+				distance++;
+			}
+			
+			if (node.distFromRidge > distance) {
+				node.distFromRidge = distance;
+			}
+			
+			if (distance > cutThresh && rightCutPoint < 0) {
+				rightCutPoint = i;
+				break;
+			}
+			
+		}
+		
 		return new BridgeResult();
 	}
+	
+	
 	
 	/*
 	 * toString

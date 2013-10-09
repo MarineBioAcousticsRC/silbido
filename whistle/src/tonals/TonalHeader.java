@@ -9,7 +9,7 @@ public class TonalHeader {
 	// define header and version
 	public static final String HEADER_STR = 
 		new String("silbido!");  // magic string
-	public static final short DET_VERSION = 2; 
+	public static final short DET_VERSION = 3; 
 
 	// for constructing feature bit-mask
 	// features produced for every point
@@ -17,9 +17,13 @@ public class TonalHeader {
 	public static final short FREQ = 1 << 1;
 	public static final short SNR = 1 << 2;
 	public static final short PHASE = 1 << 3;
+	
+	public static final short RIDGE = 1 << 6;
+	
 	// features produced once per call
 	public static final short SCORE = 1 << 4;
 	public static final short CONFIDENCE = 1 << 5;
+	
 	// default
 	public static final short DEFAULT = TIME | FREQ;
 
@@ -163,6 +167,13 @@ public class TonalHeader {
 	 */
 	public boolean hasFreq() {
 		return (bitMask & FREQ) > 0;
+	}
+	
+	/*
+	 * Is time available for each tonal?
+	 */
+	public boolean hasRidge() {
+		return (bitMask & RIDGE) > 0;
 	}
 
 	/*

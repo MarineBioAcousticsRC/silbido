@@ -14,7 +14,9 @@ public class ActiveSet extends tfTreeSet {
 	// they're second class citizens when it comes to expansion
 	// The main active set gets first short and orphans cannot join
 	// a peaks that is already connected.
-	public tfTreeSet orphans;  
+	public tfTreeSet orphans;
+	
+	public tfTreeSet ridgeFrontier; 
 	
 	// keep track of graphs in the time-frequency domain
 	public LinkedList<graph> subgraphs;
@@ -27,6 +29,8 @@ public class ActiveSet extends tfTreeSet {
 	
 	public double resolutionHz;
 	
+	public double currentGraphId = 1; 
+	
 	/*
 	 * ActiveSet
 	 * TODO:  Write docs
@@ -36,21 +40,9 @@ public class ActiveSet extends tfTreeSet {
 		subgraphs = new LinkedList<graph>();  // completed subgraphs
 		discards= new LinkedList<graph>();  // discarded subgraphs (debug)
 		orphans = new tfTreeSet();
+		ridgeFrontier = new tfTreeSet();
 	}
 	
-	/* Inner class recycler
-	 * Given a time-frequency node, recyles all tfnodes connected to it.
-	 */
-	class recycle implements ExamineNode {
-		
-		public recycle() {
-		}
-		
-		public void examine(tfnode n) {
-			tfnode.recycle(n);
-		}
-	}
-	private recycle recycler = new recycle();
 	
 	/* Counting hash for subgraphs.  Add one to the subgraph/set id for
 	 * each node associated with the subgraph.
@@ -58,7 +50,7 @@ public class ActiveSet extends tfTreeSet {
 	private void refcount(HashMap<tfnode, Integer> counts, 
 			Collection<tfnode> nodes) {
 		for (tfnode node : nodes) {
-			if (true || ! node.chained_forward()) {
+			//if (true || ! node.chained_forward()) {
 				Integer count;
 				tfnode subgraph_id = node.find();  // get set name
 				count = counts.get(subgraph_id);
@@ -66,7 +58,7 @@ public class ActiveSet extends tfTreeSet {
 					counts.put(subgraph_id, 1);  // first one
 				else
 					counts.put(subgraph_id, count+1); // another one
-			}
+			//}
 		}
 	}
 	
@@ -119,7 +111,7 @@ public class ActiveSet extends tfTreeSet {
 				retained = false;
 			}
 			
-			if (! retained) {
+			if (!retained) {
 
 				// Decrement the reference count of this set
 				tfnode subgraph_id = node.find();
@@ -134,11 +126,11 @@ public class ActiveSet extends tfTreeSet {
 					// be a tonal in here?
 					if (node.time - node.earliest_pred > minlen_s) {
 						// Construct explicit graph for further analysis.
-						subgraphs.addLast(new graph(node));
+						subgraphs.addLast(new graph(node, getNextGraphId()));
 					} else {
 						// too short, dispose of graph
 						//System.out.printf("disp %s\n", node);
-						if (! debug) {
+						if (!debug) {
 							// Post order traversal of graph to make
 							// sure that we don't recycle a node until
 							// after it has been completely visited.
@@ -146,7 +138,7 @@ public class ActiveSet extends tfTreeSet {
 						} else {
 							// debug to see what we are deleting 
 							if (node.chained_backward())
-								discards.addLast(new graph(node));
+								discards.addLast(new graph(node, getNextGraphId()));
 						}
 					}
 				}
@@ -154,19 +146,78 @@ public class ActiveSet extends tfTreeSet {
 		}
 	}
 	
+	public synchronized double getNextGraphId() {
+		double id = this.currentGraphId;
+		currentGraphId++;
+		return id;
+	}
+	
+	public void add_ridge(double[] times, double[] freqs, double[] dBs, double[] angles, double maxgap_Hz,
+			double activeset_thr_s) {
+		//System.out.println(String.format("Ridge with %d nodes being added at (%f, %f).", times.length, times[0], freqs[0]));
+		
+		tfnode firstNode = tfnode.create(times[0], freqs[0], dBs[0], angles[0], true);
+		
+		tfTreeSet set = new tfTreeSet();
+		set.add(firstNode);
+		
+		extend_aux(set, maxgap_Hz, this, true);
+		extend_aux(set, maxgap_Hz, orphans, false);
+		
+		tfnode lastNode = firstNode;
+		for (int i = 1; i < times.length; i++) {
+			 tfnode curNode = tfnode.create(times[i], freqs[i], dBs[i], angles[i], true);
+			 lastNode.chain_forward(curNode);
+			 lastNode.union(curNode);
+			 lastNode = curNode;
+		}
+		
+		if (lastNode.time - lastNode.earliest_pred > activeset_thr_s) {
+			this.add(lastNode);
+			//System.out.println("Last ridge node added to active set.");
+		} else {
+			orphans.add(lastNode);
+			//System.out.println("Last ridge node added to orphan set.");
+		}
+		
+		this.ridgeFrontier.add(firstNode);
+	}
+	
 	public void extend(tfTreeSet peaks, double maxgap_Hz,
 			double activeset_thr_s) {
-
+		tfTreeSet newRidgeFronteier = new tfTreeSet();
+		
+		double time = peaks.first().time;
+		for (tfnode ridgePeak : this.ridgeFrontier) {
+			tfnode curNode = ridgePeak;
+			while(curNode != null && curNode.time < time) {
+				if (curNode.chained_forward()) {
+					curNode = curNode.successors.get(0);
+				} else {
+					curNode = null;
+				}
+			}
+			
+			if (curNode != null) {
+				newRidgeFronteier.add(curNode);
+			}
+		}
+		
+		this.ridgeFrontier = newRidgeFronteier;
+		
 		/* Given a set of peaks, extend the frontier.
 		 * Nodes in the current active set may be joined to the
 		 * new peaks in which case they will be removed from the
 		 * current active set.
 		 */
-
 		if (debug)
 			System.out.println("Extending active set");
+		
 		// Attempt to join new peaks to existing structure
 		extend_aux(peaks, maxgap_Hz, this, true);
+		if (this.ridgeFrontier.size() > 0) {
+			extend_aux(this.ridgeFrontier, maxgap_Hz, this, true);
+		}
 
 		// orphans are short segments and may be spurious.
 		// We don't let them connect to established subgraphs
@@ -182,6 +233,10 @@ public class ActiveSet extends tfTreeSet {
 		// Determine where to put the new peaks
 		for (tfnode p : peaks) {
 			//System.out.printf("%s earliest %f s\n", p.toString(), p.earliest_pred);
+			if (p.ridge) {
+				continue;
+			}
+			
 			if (p.time - p.earliest_pred > activeset_thr_s)
 				this.add(p);
 			else
@@ -196,9 +251,24 @@ public class ActiveSet extends tfTreeSet {
 		PriorityQueue<fitness<edge<tfnode, tonal>>> candidates = 
 			new PriorityQueue<fitness<edge<tfnode, tonal>>>();
 		boolean inrange;
+		
+		if (peaks.size() < 1) {
+			return;
+		}
+		
+		double current_time = peaks.get_time()[0];
+		
 
 		/* Iterate over existing frontier */
 		for (tfnode activenode : open) {
+			
+			if (activenode.time >= current_time) {
+				continue;
+			}
+			
+			if (activenode.ridge) {
+				//System.out.println("Ridge now active.");
+			}
 			
 			/* Start searching from lowest possible peak */
 			first.freq = activenode.freq - maxgap_Hz;
@@ -211,7 +281,8 @@ public class ActiveSet extends tfTreeSet {
 				peak = peak_iter.next();
 				
 				// prime the loop by checking if peak is close enough to 
-				// the active node
+				// the active node.  If it isn't then we know that none of 
+				// the peaks will be in range.
 				inrange = Math.abs(peak.freq - search_peaks.first().freq) 
 					< maxgap_Hz;
 
@@ -337,11 +408,68 @@ public class ActiveSet extends tfTreeSet {
 			if (join) {
 				if (debug)
 					System.out.printf("accept\n");
+				if (!c.object.from.ridge && c.object.to.ridge) {
+//					System.out.println(
+//						String.format(
+//							"Peak(%.3f, %.3f) -> Ridge(%.3f, %.3f)",
+//							c.object.from.time, 
+//							c.object.from.freq,
+//							c.object.to.time, 
+//							c.object.to.freq
+//						));
+//					if (c.object.from.chained_forward()) {
+//						System.out.println("Interior ridge node joined");
+//					}
+				} else if (c.object.from.ridge && !c.object.to.ridge) {
+//					System.out.println(
+//						String.format(
+//							"Ridge(%.3f, %.3f) -> Peak(%.3f, %.3f)",
+//							c.object.from.time, 
+//							c.object.from.freq,
+//							c.object.to.time, 
+//							c.object.to.freq
+//						));
+//					if (c.object.from.chained_forward()) {
+//						System.out.println("Interior ridge node joined");
+//					}
+				} else if (c.object.from.ridge && c.object.to.ridge) {
+//					System.out.println(
+//						String.format(
+//							"Ridge(%.3f, %.3f) -> Ridge(%.3f, %.3f)",
+//							c.object.from.time, 
+//							c.object.from.freq,
+//							c.object.to.time, 
+//							c.object.to.freq
+//						));
+//					if (c.object.from.chained_forward()) {
+//						System.out.println("Interior ridge node joined");
+//					}
+				}
+				
+				
+				
 				c.object.from.chain_forward(c.object.to);  // add the link
+				c.object.to.fitError = c.score;
 				c.object.from.union(c.object.to); // merge subgraphs
 				// for now just do one, but we should find some type
 				// of threshold once we have a better handle on the
 				// fitness function
+				
+//				if (c.object.to.ridge) {
+//					tfnode lastNode = c.object.to;
+//					while(true) {
+//						if (lastNode.successors.size() == 1) {
+//							tfnode nextNode = lastNode.successors.getFirst();
+//							lastNode.union(nextNode);
+//							lastNode = nextNode;
+//						} else if (lastNode.successors.size() == 0) {
+//							break;
+//						} else {
+//							System.err.println("##ERror");
+//						}
+//					}
+//				}
+//				
 				selectedN = selectedN + 1;
 				selected.add(c);
 			} else if (debug) {

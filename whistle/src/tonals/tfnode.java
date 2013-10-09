@@ -20,6 +20,7 @@ public class tfnode implements Comparable<tfnode>, Serializable
     public double phase;
     public boolean ridge;
     public int distFromRidge;
+    public double fitError = -1;
     
     //public double dphase;  // derivative of phase
     //public double ddphase; // 2nd derivative of phase
@@ -124,6 +125,7 @@ public class tfnode implements Comparable<tfnode>, Serializable
     	this.freq = freq;
     	this.phase = phase;
     	this.ridge = ridge;
+    	this.snr = snr;
     	//this.dphase = dphase;
     	//this.ddphase = ddphase;
     	
@@ -201,29 +203,29 @@ public class tfnode implements Comparable<tfnode>, Serializable
     	return linked;
     }
     
-    public tonal best_path() {
-    	
-    	LinkedList<tfnode> path = new LinkedList<tfnode>();
-    	
-    	/* Search for best predecessor path.
-    	 * For now, just look for longest
-    	 * later look at slope and phase
-    	 */
-    	    	
-    	tfnode current = this;
-    	while (current != null) {    		    		    		  			
-    		path.addFirst(current);      
-    		
-    		/* look for best previous one. 
-    		 * Single node lookback may not be the best strategy,
-    		 * but okay for now.
-    		 */
-    		current = current.best_predecessor();
-    	}
-    	
-    	tonal tonepath = new tonal(path);
-    	return tonepath;
-    }
+//    public tonal best_path() {
+//    	
+//    	LinkedList<tfnode> path = new LinkedList<tfnode>();
+//    	
+//    	/* Search for best predecessor path.
+//    	 * For now, just look for longest
+//    	 * later look at slope and phase
+//    	 */
+//    	    	
+//    	tfnode current = this;
+//    	while (current != null) {    		    		    		  			
+//    		path.addFirst(current);      
+//    		
+//    		/* look for best previous one. 
+//    		 * Single node lookback may not be the best strategy,
+//    		 * but okay for now.
+//    		 */
+//    		current = current.best_predecessor();
+//    	}
+//    	
+//    	tonal tonepath = new tonal(path);
+//    	return tonepath;
+//    }
     
     /* estimate the derivative of phase */
     double dphase_est(double min_s) {

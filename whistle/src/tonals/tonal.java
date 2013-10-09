@@ -4,17 +4,19 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
+import java.io.Serializable;
 import java.util.Collections;
 import java.io.DataInputStream;
 
 import java.util.*;
 
-public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
+public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Serializable
 {
 	static final long serialVersionUID = 0;
 	private static int toStringLastN = 1;
 	private static int toStringFirstN = 2;
 	final double Pi2 = 2 * Math.PI;
+	final double graphId;
 	
     /* provide interface for sorting by time 
      * which is not the natural order for this set
@@ -30,26 +32,35 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
     		}
     };
     
-	public tonal() {
+	public tonal(double graphId) {
 		super();
+		this.graphId = graphId;
 	}
 	
-	public tonal(tfnode n) {
+	public tonal(tfnode n, double graphId) {
 		super();
 		this.add(n);
+		this.graphId = graphId;
 	}
 	
-	tonal(AbstractSequentialList<tfnode> node_list) {
+	tonal(AbstractSequentialList<tfnode> node_list, double graphId) {
 		super();
 		this.addAll(node_list);
+		this.graphId = graphId;
 	}
 	
-	public tonal(double[] time, double[] freq) {
+	public tonal(double[] time, double[] freq, double graphId) {
 		// Create a tonal given arrays time and frequency.
 		super();
-		for (int i=0; i < time.length; i++) 
+		for (int i=0; i < time.length; i++)  {
 			// FIXME ridge
 			this.add(tfnode.create(time[i], freq[i], 0.0, 0.0, false));
+		}
+		this.graphId = graphId;
+	}
+	
+	public double getGraphId() {
+		return graphId;
 	}
 	
 	// 
@@ -83,6 +94,7 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
 	// then we create tonals and return linked list of tonals.
 	// @param - filename from which to read
 	//
+	@Deprecated
 	static public LinkedList<tonal> tonalsLoadBinary(String Filename)
 	throws IOException, ClassNotFoundException
 	{
@@ -106,7 +118,8 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
 					tfnodes.add(new tfnode(time, freq, 0.0, 0.0, false));
 					N--;
 				}
-				t = new tonal(tfnodes);
+				// FIXME Graph ID
+				t = new tonal(tfnodes, 0);
 				tonals.add(t);
 			}
 		} catch (EOFException e) {
@@ -206,7 +219,7 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>
 
 	// deep copy of list structure, but not list itself
 	public tonal clone() {
-		return new tonal(this);
+		return new tonal(this, this.graphId);
 	}
 	
 	// are two tonal paths the same?

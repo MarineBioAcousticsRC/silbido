@@ -121,7 +121,9 @@ public class TonalBinaryInputStream {
 
 		// Initialize linked list
 		LinkedList<tonal> tonals = new LinkedList<tonal>();
-		double time = 0.0, freq = 0.0, snr = 0.0, phase  = 0.0;	
+		double time = 0.0, freq = 0.0, snr = 0.0, phase  = 0.0;
+		boolean ridge = false;
+		
 		fbit_mask = featBitMask;
 		// Read in time and freq from the file and create list of tonals
 		try {
@@ -137,6 +139,11 @@ public class TonalBinaryInputStream {
 				
 				// Read tonal itself
 				tonal t = null;
+				double graphId = -1;
+				
+				if (hdr.version > 2) {
+					graphId = datastream.readDouble();
+				}
 				int N = datastream.readInt();
 				LinkedList<tfnode> tfnodes = new LinkedList<tfnode>();
 				while (N > 0) {
@@ -148,10 +155,12 @@ public class TonalBinaryInputStream {
 						snr = datastream.readDouble();
 					if ((fbit_mask & TonalHeader.PHASE) != 0)
 						phase = datastream.readDouble();
-					tfnodes.add(new tfnode(time, freq, snr, phase, false));
+					if ((fbit_mask & TonalHeader.RIDGE) != 0)
+						ridge = datastream.readBoolean();
+					tfnodes.add(new tfnode(time, freq, snr, phase, ridge));
 					N--;			
 				}
-				t = new tonal(tfnodes);
+				t = new tonal(tfnodes, graphId);
 				tonals.add(t);
 			}
 			
@@ -163,8 +172,4 @@ public class TonalBinaryInputStream {
 		return tonals;
 		
 	}
-
-
-
-
 }

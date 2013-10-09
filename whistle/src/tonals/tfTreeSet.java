@@ -15,11 +15,13 @@ public class tfTreeSet extends TreeSet<tfnode> {
 		/* Create a set of tfnodes given arrays time, freq, 
     	 * phase, and its derivative
     	 */
-    	
-    	/* todo - add exception for bad lengths */
-    	for (int i=0; i < time.length; i++)
-    		this.add(tfnode.create(time[i], freq[i], snr[i], phase[i], ridge[i]==1));
-    				//dphase[i], ddphase[i]));
+		
+		if (time != null) {
+	    	/* todo - add exception for bad lengths */
+	    	for (int i=0; i < time.length; i++)
+	    		this.add(tfnode.create(time[i], freq[i], snr[i], phase[i], ridge[i]==1));
+	    				//dphase[i], ddphase[i]));
+		}
     }
     
 	public tfTreeSet() {

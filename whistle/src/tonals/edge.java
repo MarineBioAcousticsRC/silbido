@@ -1,9 +1,11 @@
 package tonals;
 
+import java.io.Serializable;
+
 // Edges in a graph of nodes of a generic type
 public class edge<TNode extends Comparable<TNode>, 
 				  TContent extends Comparable<TContent>> 
-	implements Comparable<edge<TNode, TContent>> 
+	implements Comparable<edge<TNode, TContent>>, Serializable 
 {
 	public TNode from;
 	public TNode to;

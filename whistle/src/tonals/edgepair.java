@@ -1,8 +1,9 @@
 package tonals;
 
+import java.io.Serializable;
 import java.util.Formatter;
 
-public class edgepair implements Comparable<edgepair> {
+public class edgepair implements Comparable<edgepair>, Serializable {
 	public edge<tfnode, tonal> a;
 	public edge<tfnode, tonal> b;
 	
