@@ -20,8 +20,11 @@ public class ActiveSet extends tfTreeSet {
 	
 	// keep track of graphs in the time-frequency domain
 	public LinkedList<graph> subgraphs;
+	
+	HashMap<tfnode, Integer> counts = new HashMap<tfnode, Integer>();
 
 	static public boolean debug = false;
+	
 	// This is for debugging and is not used in production versions
 	public LinkedList<graph> discards;
 	
@@ -43,24 +46,6 @@ public class ActiveSet extends tfTreeSet {
 		ridgeFrontier = new tfTreeSet();
 	}
 	
-	
-	/* Counting hash for subgraphs.  Add one to the subgraph/set id for
-	 * each node associated with the subgraph.
-	 */
-	private void refcount(HashMap<tfnode, Integer> counts, 
-			Collection<tfnode> nodes) {
-		for (tfnode node : nodes) {
-			Integer count;
-			tfnode subgraph_id = node.find();  // get set name
-			count = counts.get(subgraph_id);
-			if (count == null)
-				counts.put(subgraph_id, 1);  // first one
-			else
-				counts.put(subgraph_id, count+1); // another one
-
-		}
-	}
-	
 	public void prune(double time_s, double minlen_s, double maxgap_s) { 
 		/* Prune the current active set.
 		 * 
@@ -68,25 +53,18 @@ public class ActiveSet extends tfTreeSet {
 		 * When this occurs, nodes are discarded if they are not part of a 
 		 * long enough (minlen_s) chain, or saved in the set of tonals. 
 		 */
-		
-		/*
-		 *  Determine how many times each subgraph appears in the ActiveSet
-		 *  as a terminal node.  We do this each time as union operations
-		 *  can change ownership of a node as the graph grows.
-		 */
-		HashMap<tfnode, Integer> counts = new HashMap<tfnode, Integer>();
-		refcount(counts, this);
-		refcount(counts, orphans);
-		if (debug)
+				
+		if (debug) {
 			System.out.println("Pruning active_set");
-		prune_aux(time_s, minlen_s, maxgap_s, counts, this);
-		if (debug)
+		}
+		prune_aux(time_s, minlen_s, maxgap_s, this);
+		if (debug) {
 			System.out.println("Pruning orphans");
-		prune_aux(time_s, minlen_s, maxgap_s, counts, orphans);
+		}
+		prune_aux(time_s, minlen_s, maxgap_s, orphans);
 	}
 	
-	private void prune_aux(double time_s, double minlen_s, double maxgap_s,
-			HashMap<tfnode, Integer> counts, Collection<tfnode> nodeset) {
+	private void prune_aux(double time_s, double minlen_s, double maxgap_s, Collection<tfnode> nodeset) {
 		
 		/* iterate over each item in the active set */
 		Iterator<tfnode> iter = nodeset.iterator();
@@ -111,13 +89,13 @@ public class ActiveSet extends tfTreeSet {
 			}
 			
 			if (!retained) {
-
 				// Decrement the reference count of this set
 				tfnode subgraph_id = node.find();
 				Integer nrefs = counts.get(subgraph_id) - 1;
 				counts.put(subgraph_id, nrefs);
 
 				if (nrefs == 0) {
+					this.counts.remove(subgraph_id);
 					// We are removing the last reference to a subgraph
 					// from the active set.c
 
@@ -232,6 +210,15 @@ public class ActiveSet extends tfTreeSet {
 		
 		// Determine where to put the new peaks
 		for (tfnode p : peaks) {
+			
+			tfnode subgraph_id = p.find();  // find the subgraph.
+			Integer count = counts.get(subgraph_id);
+			if (count == null) {
+				counts.put(subgraph_id, 1);  // first one
+			} else {
+				counts.put(subgraph_id, count+1); // another one
+			}
+			
 			//System.out.printf("%s earliest %f s\n", p.toString(), p.earliest_pred);
 			if (p.ridge) {
 				continue;
@@ -452,10 +439,20 @@ public class ActiveSet extends tfTreeSet {
 				
 				c.object.from.chain_forward(c.object.to);  // add the link
 				c.object.to.fitError = c.score;
+				
+				tfnode old_root = c.object.to.find();
+				Integer old_count = this.counts.remove(old_root);
+				tfnode new_root = c.object.from.find();
+				if (old_count != null) {
+					this.counts.put(new_root, counts.get(new_root) + old_count);
+				}
+				
 				c.object.from.union(c.object.to); // merge subgraphs
 				// for now just do one, but we should find some type
 				// of threshold once we have a better handle on the
 				// fitness function
+				
+				
 				
 //				if (c.object.to.ridge) {
 //					tfnode lastNode = c.object.to;
