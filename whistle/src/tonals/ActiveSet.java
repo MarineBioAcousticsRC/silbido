@@ -50,15 +50,14 @@ public class ActiveSet extends tfTreeSet {
 	private void refcount(HashMap<tfnode, Integer> counts, 
 			Collection<tfnode> nodes) {
 		for (tfnode node : nodes) {
-			//if (true || ! node.chained_forward()) {
-				Integer count;
-				tfnode subgraph_id = node.find();  // get set name
-				count = counts.get(subgraph_id);
-				if (count == null)
-					counts.put(subgraph_id, 1);  // first one
-				else
-					counts.put(subgraph_id, count+1); // another one
-			//}
+			Integer count;
+			tfnode subgraph_id = node.find();  // get set name
+			count = counts.get(subgraph_id);
+			if (count == null)
+				counts.put(subgraph_id, 1);  // first one
+			else
+				counts.put(subgraph_id, count+1); // another one
+
 		}
 	}
 	
@@ -183,8 +182,7 @@ public class ActiveSet extends tfTreeSet {
 		this.ridgeFrontier.add(firstNode);
 	}
 	
-	public void extend(tfTreeSet peaks, double maxgap_Hz,
-			double activeset_thr_s) {
+	public void extend(tfTreeSet peaks, double maxgap_Hz, double activeset_thr_s) {
 		tfTreeSet newRidgeFronteier = new tfTreeSet();
 		
 		double time = peaks.first().time;
@@ -210,8 +208,9 @@ public class ActiveSet extends tfTreeSet {
 		 * new peaks in which case they will be removed from the
 		 * current active set.
 		 */
-		if (debug)
+		if (debug) {
 			System.out.println("Extending active set");
+		}
 		
 		// Attempt to join new peaks to existing structure
 		extend_aux(peaks, maxgap_Hz, this, true);
@@ -226,8 +225,9 @@ public class ActiveSet extends tfTreeSet {
 		// When impulsive noise is present, it is very easy for these
 		// to grow and as a consequence we can disable their use
 		// in these regions
-		if (debug)
+		if (debug) {
 			System.out.println("Extending orphans");
+		}
 		extend_aux(peaks, maxgap_Hz, orphans, false);
 		
 		// Determine where to put the new peaks
@@ -237,10 +237,11 @@ public class ActiveSet extends tfTreeSet {
 				continue;
 			}
 			
-			if (p.time - p.earliest_pred > activeset_thr_s)
+			if (p.time - p.earliest_pred > activeset_thr_s) {
 				this.add(p);
-			else
+			} else {
 				orphans.add(p);
+			}
 		}
 	}
 
@@ -395,10 +396,11 @@ public class ActiveSet extends tfTreeSet {
 							double crossing = 
 								(c.object.to.freq - c.object.from.freq) *
 								(freq_hat - c.object.to.freq);
-							if (crossing <= 0)
+							
+							if (crossing <= 0) {
 								join = false;
+							}
 						}
-
 					} else {
 						join = false;
 					}
