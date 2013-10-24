@@ -48,9 +48,9 @@ function dtPlotBrightContrast_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.ImageH = varargin{1};
 pwr_brt_cont = get(handles.ImageH(1), 'UserData');
 set(handles.brightscr, 'Value', pwr_brt_cont.bright_dB);
-set(handles.contrastscr, 'Value', pwr_brt_cont.contrast_dB);
+set(handles.contrastscr, 'Value', pwr_brt_cont.contrast_Pct);
 set(handles.brightedt, 'String', num2str(pwr_brt_cont.bright_dB));
-set(handles.contrastedt, 'String', num2str(pwr_brt_cont.contrast_dB));
+set(handles.contrastedt, 'String', num2str(pwr_brt_cont.contrast_Pct));
 
 % Choose default command line output for dtPlotBrightContrast
 handles.output = hObject;
