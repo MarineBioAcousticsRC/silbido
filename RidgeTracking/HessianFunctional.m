@@ -1,5 +1,5 @@
-function angle=HessianFunctional(derivatives, x, y)
-% HessianFunctional2
+function [angle, gv, ev] = HessianFunctional(derivatives, x, y, horizPriority)
+% HessianFunctional
 %
 % Calculates the "functional" matrix, i.e. the angle between the dominant
 % eigenvector of the Hessian matrix, and the gradient vector for each pixel
@@ -18,7 +18,7 @@ function angle=HessianFunctional(derivatives, x, y)
 
 %
 % Output:
-%   A - Functional matrix (angles).
+%   angle - Functional matrix (angles).
 %
     
 % Find the angle between the gradient and the Hessian dominant
@@ -30,26 +30,27 @@ xy = derivatives.gxy(x,y);
 yx = derivatives.gyx(x,y);
 yy = derivatives.gyy(x,y);
 
-if (yy>0)
+if (yy > 0 && horizPriority)
     angle = NaN;
+    gv = [NaN NaN];
+    ev = [NaN NaN];
     return;
 end
     
-H=[xx xy;yx yy];
+H = [xx xy; yx yy];
+
 % Set up the gradient vector
-g=[derivatives.gx(x,y);derivatives.gy(x,y)];
+gv = [derivatives.gx(x,y); derivatives.gy(x,y)];
 
 % Find the dominant eigenvector of the Hessian matrix
-[V,E]=eig(H);
-if abs(E(1,1))>abs(E(2,2))
-    v=V(:,1);
+[V, E] = eig(H);
+if abs(E(1,1)) > abs(E(2,2))
+    ev = V(:,1);
 else
-    v=V(:,2);
+    ev = V(:,2);
 end
 
-% Calculate the angle between V and g and place it in A
-v=v/norm(v);
-g=g/norm(g);
-angle=dot(v,g);
+% Calculate the angle between v and g and place it in angle
+angle = dot(ev / norm(ev),gv / norm(gv));
 
 
