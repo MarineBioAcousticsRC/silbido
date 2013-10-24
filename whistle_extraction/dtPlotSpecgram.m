@@ -1,4 +1,4 @@
-function [AxisH, ImageH, ColorbarH] = dtPlotSpecgram(File, Start_s, Stop_s, varargin)
+function [AxisH, ImageH, ColorbarH, snr_dB] = dtPlotSpecgram(File, Start_s, Stop_s, varargin)
 % dtPlotSpecgram(File, Start_s, Stop_s, OptionalArgs)
 % Plot spectrogram for specified file between start and stop time in s.
 %
