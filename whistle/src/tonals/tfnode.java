@@ -7,9 +7,9 @@ package tonals;
 import java.util.*;
 import java.io.Serializable;
 
-public class tfnode implements Comparable<tfnode>, Serializable
-{
+public class tfnode implements Comparable<tfnode>, Serializable {
 	static final long serialVersionUID = 3;
+	
 	/* conversion factors */
 	final public static double HzPerkHz = 1000.0;
 	
@@ -19,6 +19,8 @@ public class tfnode implements Comparable<tfnode>, Serializable
     public double snr;  // signal to noise ratio dB re noise floor
     public double phase;
     public boolean ridge;
+    
+    
     public int distFromRidge;
     public double fitError = -1;
     
@@ -449,6 +451,47 @@ public class tfnode implements Comparable<tfnode>, Serializable
     	return String.format("(%.3f s, %.2f kHz, %.2f rad)",
     			time, freq/HzPerkHz, phase);
     }
-    
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		long temp;
+		temp = Double.doubleToLongBits(freq);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
+		temp = Double.doubleToLongBits(phase);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
+		result = prime * result + (ridge ? 1231 : 1237);
+		temp = Double.doubleToLongBits(snr);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
+		temp = Double.doubleToLongBits(time);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		tfnode other = (tfnode) obj;
+		if (Double.doubleToLongBits(freq) != Double
+				.doubleToLongBits(other.freq))
+			return false;
+		if (Double.doubleToLongBits(phase) != Double
+				.doubleToLongBits(other.phase))
+			return false;
+		if (ridge != other.ridge)
+			return false;
+		if (Double.doubleToLongBits(snr) != Double.doubleToLongBits(other.snr))
+			return false;
+		if (Double.doubleToLongBits(time) != Double
+				.doubleToLongBits(other.time))
+			return false;
+		return true;
+	}
 }
     
