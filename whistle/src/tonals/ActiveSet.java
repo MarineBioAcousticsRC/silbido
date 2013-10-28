@@ -3,47 +3,86 @@ package tonals;
 import java.util.*;
 
 
-// idea
-// for orphans, don't let them bridge as far...
-
-public class ActiveSet extends tfTreeSet {
+// This used to be a set itself, which it should not be
+public class ActiveSet {
 	
-	private tfnode first; // used to search peak list
-
-	// peaks we've seen in the past who are part of a short graph
-	// they're second class citizens when it comes to expansion
-	// The main active set gets first short and orphans cannot join
-	// a peaks that is already connected.
-	public tfTreeSet orphans;
+	/**
+	 * Determines if debugging output and data collection is performed. 
+	 */
+	public static boolean DEBUGGING = false;
 	
-	public tfTreeSet ridgeFrontier; 
+	/** 
+	 * The set of nodes that belong to graphs that are of sufficient
+	 * length to be considered likely to produce good tonals.
+	 */
+	private tfTreeSet activeSet;
 	
-	// keep track of graphs in the time-frequency domain
-	public LinkedList<graph> subgraphs;
+	/**
+	 * The set of nodes that belong to graphs that are too short to be
+	 * likely to produce good detections.  All new individual nodes get
+	 * placed here if they are not joined immediately.  They are then
+	 * promoted to the active set when the graphs they are a part of
+	 * are of sufficient length.
+	 * 
+	 * These peaks are second class citizens.  The active set is extended
+	 * first, and orphans can not join to peaks that are already connected
+	 * to other graphs.  This helps avoid joining spurs that develop shooting
+	 * off of good graphs.
+	 * 
+	 * TODO: for orphans, don't let them bridge as far...
+	 */
+	private tfTreeSet orphans;
 	
-	HashMap<tfnode, Integer> counts = new HashMap<tfnode, Integer>();
-
-	static public boolean debug = false;
+	private tfTreeSet ridgeFrontier; 
 	
-	// This is for debugging and is not used in production versions
-	public LinkedList<graph> discards;
+	// used to search peak list
+	private final tfnode dummySearchNode;
 	
-	static final long serialVersionUID = 1;
+	private final HashMap<tfnode,PartialGraph> partialGraphs;
 	
-	public double resolutionHz;
+	/**
+	 * Graphs that are closed and that were of sufficient length to likely
+	 * contain good detections.
+	 */
+	private final LinkedList<graph> resultGraphs;
 	
-	public double currentGraphId = 1; 
+	
+	/**
+	 * Graphs that were discarded when they were closed because they were to
+	 * short.
+	 */
+	private final LinkedList<graph> discardedGraphs;
+	
+	
+	// TODO: What does this do?
+	private double resolutionHz;
+	
+	/**
+	 * A monotonically increasing graph id used to uniquely identify a graph 
+	 * within a particular graph generator.
+	 */
+	private double currentGraphId = 1; 
 	
 	/*
 	 * ActiveSet
 	 * TODO:  Write docs
 	 */
 	public ActiveSet() {
-		first = new tfnode(0, 0, 0, 0, false);  // used to search peak list
-		subgraphs = new LinkedList<graph>();  // completed subgraphs
-		discards= new LinkedList<graph>();  // discarded subgraphs (debug)
+		dummySearchNode = new tfnode(0, 0, 0, 0, false);  // used to search peak list
+		resultGraphs = new LinkedList<graph>();  // completed subgraphs
+		discardedGraphs= new LinkedList<graph>();  // discarded subgraphs (debug)
 		orphans = new tfTreeSet();
+		activeSet = new tfTreeSet();
 		ridgeFrontier = new tfTreeSet();
+		this.partialGraphs = new HashMap<tfnode, PartialGraph>();
+	}
+	
+	public void setResolutionHz(double resolutionHz) {
+		this.resolutionHz = resolutionHz;
+	}
+	
+	public List<graph> getResultGraphs() {
+		return this.resultGraphs;
 	}
 	
 	public void prune(double time_s, double minlen_s, double maxgap_s) { 
@@ -54,11 +93,11 @@ public class ActiveSet extends tfTreeSet {
 		 * long enough (minlen_s) chain, or saved in the set of tonals. 
 		 */
 				
-		if (debug) {
+		if (DEBUGGING) {
 			System.out.println("Pruning active_set");
 		}
-		prune_aux(time_s, minlen_s, maxgap_s, this);
-		if (debug) {
+		prune_aux(time_s, minlen_s, maxgap_s, activeSet);
+		if (DEBUGGING) {
 			System.out.println("Pruning orphans");
 		}
 		prune_aux(time_s, minlen_s, maxgap_s, orphans);
@@ -91,11 +130,14 @@ public class ActiveSet extends tfTreeSet {
 			if (!retained) {
 				// Decrement the reference count of this set
 				tfnode subgraph_id = node.find();
-				Integer nrefs = counts.get(subgraph_id) - 1;
-				counts.put(subgraph_id, nrefs);
+				PartialGraph graph = partialGraphs.get(subgraph_id);
+				int nrefs = graph.getReferenceCount() - 1;
+				graph.setReferenceCount(nrefs);
+
 
 				if (nrefs == 0) {
-					this.counts.remove(subgraph_id);
+					partialGraphs.remove(subgraph_id);
+
 					// We are removing the last reference to a subgraph
 					// from the active set.c
 
@@ -103,27 +145,21 @@ public class ActiveSet extends tfTreeSet {
 					// be a tonal in here?
 					if (node.time - node.earliest_pred > minlen_s) {
 						// Construct explicit graph for further analysis.
-						subgraphs.addLast(new graph(node, getNextGraphId()));
-					} else {
-						// too short, dispose of graph
-						//System.out.printf("disp %s\n", node);
-						if (!debug) {
-							// Post order traversal of graph to make
-							// sure that we don't recycle a node until
-							// after it has been completely visited.
-							//node.visitPostOrder(recycler);
-						} else {
-							// debug to see what we are deleting 
-							if (node.chained_backward())
-								discards.addLast(new graph(node, getNextGraphId()));
-						}
+						resultGraphs.addLast(new graph(node, getNextGraphId()));
+					} else if (DEBUGGING && node.chained_backward()) {
+						// If we are debugging capture this graph.
+						discardedGraphs.addLast(new graph(node, getNextGraphId()));
 					}
 				}
 			}
 		}
 	}
 	
-	public synchronized double getNextGraphId() {
+	/**
+	 * Returns the next graph id to use when constructing a graph.
+	 * @return The next graph id.
+	 */
+	private double getNextGraphId() {
 		double id = this.currentGraphId;
 		currentGraphId++;
 		return id;
@@ -138,7 +174,7 @@ public class ActiveSet extends tfTreeSet {
 		tfTreeSet set = new tfTreeSet();
 		set.add(firstNode);
 		
-		extend_aux(set, maxgap_Hz, this, true);
+		extend_aux(set, maxgap_Hz, activeSet, true);
 		extend_aux(set, maxgap_Hz, orphans, false);
 		
 		tfnode lastNode = firstNode;
@@ -150,7 +186,7 @@ public class ActiveSet extends tfTreeSet {
 		}
 		
 		if (lastNode.time - lastNode.earliest_pred > activeset_thr_s) {
-			this.add(lastNode);
+			activeSet.add(lastNode);
 			//System.out.println("Last ridge node added to active set.");
 		} else {
 			orphans.add(lastNode);
@@ -186,14 +222,14 @@ public class ActiveSet extends tfTreeSet {
 		 * new peaks in which case they will be removed from the
 		 * current active set.
 		 */
-		if (debug) {
+		if (DEBUGGING) {
 			System.out.println("Extending active set");
 		}
 		
 		// Attempt to join new peaks to existing structure
-		extend_aux(peaks, maxgap_Hz, this, true);
+		extend_aux(peaks, maxgap_Hz, activeSet, true);
 		if (this.ridgeFrontier.size() > 0) {
-			extend_aux(this.ridgeFrontier, maxgap_Hz, this, true);
+			extend_aux(this.ridgeFrontier, maxgap_Hz, activeSet, true);
 		}
 
 		// orphans are short segments and may be spurious.
@@ -203,7 +239,7 @@ public class ActiveSet extends tfTreeSet {
 		// When impulsive noise is present, it is very easy for these
 		// to grow and as a consequence we can disable their use
 		// in these regions
-		if (debug) {
+		if (DEBUGGING) {
 			System.out.println("Extending orphans");
 		}
 		extend_aux(peaks, maxgap_Hz, orphans, false);
@@ -212,11 +248,12 @@ public class ActiveSet extends tfTreeSet {
 		for (tfnode p : peaks) {
 			
 			tfnode subgraph_id = p.find();  // find the subgraph.
-			Integer count = counts.get(subgraph_id);
-			if (count == null) {
-				counts.put(subgraph_id, 1);  // first one
+			PartialGraph graph = partialGraphs.get(subgraph_id);
+			
+			if (graph == null) {
+				partialGraphs.put(subgraph_id, new PartialGraph(subgraph_id));  // first one
 			} else {
-				counts.put(subgraph_id, count+1); // another one
+				graph.setReferenceCount(graph.getReferenceCount() + 1);
 			}
 			
 			//System.out.printf("%s earliest %f s\n", p.toString(), p.earliest_pred);
@@ -225,7 +262,7 @@ public class ActiveSet extends tfTreeSet {
 			}
 			
 			if (p.time - p.earliest_pred > activeset_thr_s) {
-				this.add(p);
+				activeSet.add(p);
 			} else {
 				orphans.add(p);
 			}
@@ -235,15 +272,17 @@ public class ActiveSet extends tfTreeSet {
 	private void extend_aux(tfTreeSet peaks, double maxgap_Hz,
 			Collection<tfnode> open, boolean joinExisting) {
 		
-		// Candidates for extension
-		PriorityQueue<fitness<edge<tfnode, tonal>>> candidates = 
-			new PriorityQueue<fitness<edge<tfnode, tonal>>>();
-		boolean inrange;
-		
 		if (peaks.size() < 1) {
 			return;
 		}
 		
+		// Candidates for extension
+		PriorityQueue<fitness<edge<tfnode, tonal>>> candidates = 
+			new PriorityQueue<fitness<edge<tfnode, tonal>>>();
+		
+		boolean inrange = false;
+		
+		// At each step, all peaks are in the same time slice.
 		double current_time = peaks.get_time()[0];
 		
 
@@ -259,8 +298,8 @@ public class ActiveSet extends tfTreeSet {
 			}
 			
 			/* Start searching from lowest possible peak */
-			first.freq = activenode.freq - maxgap_Hz;
-			NavigableSet<tfnode> search_peaks = peaks.tailSet(first, true);
+			dummySearchNode.freq = activenode.freq - maxgap_Hz;
+			NavigableSet<tfnode> search_peaks = peaks.tailSet(dummySearchNode, true);
 			LinkedList<FitPoly> active_fits;
 			tfnode peak;
 
@@ -271,8 +310,7 @@ public class ActiveSet extends tfTreeSet {
 				// prime the loop by checking if peak is close enough to 
 				// the active node.  If it isn't then we know that none of 
 				// the peaks will be in range.
-				inrange = Math.abs(peak.freq - search_peaks.first().freq) 
-					< maxgap_Hz;
+				inrange = Math.abs(peak.freq - search_peaks.first().freq) < maxgap_Hz;
 
 				if (inrange) {
 					// Determine time x freq trajectories into activenode
@@ -280,13 +318,14 @@ public class ActiveSet extends tfTreeSet {
 				} else {
 					active_fits = null;
 				}
+				
 				while (inrange) {
 					for (FitPoly fit : active_fits) {
 						// fitness criteria
 						// squared error distance from predicted next
 						// frequency with ties broken by choosing the
 						// closest node.
-						double error = fit.sq_error(peak.time, peak.freq);
+						double error = fit.getSquaredErrorForPoint(peak.time, peak.freq);
 						fitness<edge<tfnode, tonal>> f = 
 							new fitness<edge<tfnode, tonal>>(
 									new edge<tfnode, tonal>(activenode, peak), 
@@ -305,6 +344,11 @@ public class ActiveSet extends tfTreeSet {
 			}
 		}
 
+		
+		if (DEBUGGING) {
+			System.out.printf("Extending to peaks:\n");
+		}
+		
 		// for debugging
 		int selectedN = 0;
 		LinkedList<fitness<edge<tfnode, tonal>>> selected = 
@@ -313,16 +357,17 @@ public class ActiveSet extends tfTreeSet {
 		// now have big list of candidates sorted by priority
 		// need to start connecting things according to the rules
 		double max_err = maxgap_Hz * maxgap_Hz;
+		boolean join = false;
+		
 		// can't use iterator - poll
 		fitness<edge<tfnode, tonal>> c = candidates.poll();
-		if (debug)
-			System.out.printf("Extending to peaks:\n");
-		boolean join;
-		
 		while (c != null) {
-			if (debug)
+			if (DEBUGGING) {
 				System.out.printf("%s: ", c.toString());
+			}
+			
 			join = c.score < max_err;  // meets distance criterion?
+			
 			if (join) {
 				if (c.object.to.chained_backward()) {
 					// peak is already linked to something
@@ -345,6 +390,8 @@ public class ActiveSet extends tfTreeSet {
 						if (join) {
 							// Don't permit a cycle to form
 							join = ! c.object.to.ismember(c.object.from);
+							PartialGraph partialGraph = partialGraphs.get(c.object.to.find());
+							partialGraph.setCycleCount(partialGraph.getCycleCount() + 1);
 						}
 						
 						// We used to do a poor-man's version of the
@@ -386,6 +433,8 @@ public class ActiveSet extends tfTreeSet {
 							
 							if (crossing <= 0) {
 								join = false;
+							} else {
+								
 							}
 						}
 					} else {
@@ -395,7 +444,7 @@ public class ActiveSet extends tfTreeSet {
 			}
 
 			if (join) {
-				if (debug)
+				if (DEBUGGING)
 					System.out.printf("accept\n");
 				if (!c.object.from.ridge && c.object.to.ridge) {
 //					System.out.println(
@@ -441,17 +490,18 @@ public class ActiveSet extends tfTreeSet {
 				c.object.to.fitError = c.score;
 				
 				tfnode old_root = c.object.to.find();
-				Integer old_count = this.counts.remove(old_root);
-				tfnode new_root = c.object.from.find();
-				if (old_count != null) {
-					this.counts.put(new_root, counts.get(new_root) + old_count);
+				PartialGraph oldGraph = partialGraphs.remove(old_root);
+				
+				if (oldGraph != null) {
+					tfnode new_root = c.object.from.find();
+					PartialGraph newGraph = partialGraphs.get(new_root);
+					newGraph.merge(oldGraph);
 				}
 				
 				c.object.from.union(c.object.to); // merge subgraphs
 				// for now just do one, but we should find some type
 				// of threshold once we have a better handle on the
 				// fitness function
-				
 				
 				
 //				if (c.object.to.ridge) {
@@ -471,27 +521,30 @@ public class ActiveSet extends tfTreeSet {
 //				
 				selectedN = selectedN + 1;
 				selected.add(c);
-			} else if (debug) {
+			} else if (DEBUGGING) {
 				System.out.printf("reject: ");
-				if (c.score >= max_err)
+				if (c.score >= max_err) {
 					System.out.printf("score\n");
-				else if (joinExisting)
+				} else if (joinExisting) {
 					System.out.printf("direct-path\n");
-				else
+				} else {
 					System.out.printf("joined\n");
+				}
 			}
 				
 			c = candidates.poll();
 		}
 		if (selectedN > 0) {
 			selected.clear();
-		} else
+		} else {
 			selected.clear();  // nobody picked
+		}
 	}
 	
 	private LinkedList<FitPoly> fits(tfnode n, double back_s) {
 		LinkedList<FitPoly> list = new LinkedList<FitPoly>();
 
+		// TODO What is this hard coded number.
 		final double 	 fit_thresh = .6;
 		
 		double start = n.time;
@@ -514,10 +567,10 @@ public class ActiveSet extends tfTreeSet {
 			if (start - n.time >= back_s || ! n.chained_backward()) {
 				int order = 1;
 				// far enough back, fit the polynomial
-				FitPoly fit = new FitPoly(order, t, f);
-				if (debug) {
-					System.out.printf("%d order fit t=%s; f=%s;\n", 
-							order, t.toString(), f.toString());
+				//FitPoly fit = new FitPolyOrig(order, t, f);
+				FitPoly fit = new FitPolyJama(order, t, f);
+				if (DEBUGGING) {
+					System.out.printf("%d order fit t=%s; f=%s;\n", order, t.toString(), f.toString());
 					System.out.printf("p=%s;\n", fit.toString());
 				}
 				order = order + 1;
@@ -526,14 +579,18 @@ public class ActiveSet extends tfTreeSet {
 				// that is somewhere near our quantization noise or
 				// if there are not enough points to get a good
 				// higher order fit, we live with the fit we have.
-				while (fit.R2 < fit_thresh && 
-						fit.std_dev > 2 * resolutionHz && 
-						t.size() > order*3) {
+				//while (fit.R2() < fit_thresh && fit.stdDev() > 2 * resolutionHz && t.size() > order*3) {
+				while (fit.getAdjustedR2() < fit_thresh && t.size() > order*3 && order <= 2) {
 					// lousy fit, try again
-					order = order + 1;
-					fit = new FitPoly(order, t, f);
-					if (debug)
+//					order = order + 1;
+					//FitPoly fit = new FitPolyOrig(order, t, f);
+					FitPoly newFit = new FitPolyJama(order, t, f);
+					if(newFit.getAdjustedR2() > fit.getAdjustedR2()){
+						fit = newFit;
+					}
+					if (DEBUGGING)
 						System.out.printf("Refit p=%s\n", fit.toString());
+					order = order + 1;
 				}
 				list.add(fit);
 				

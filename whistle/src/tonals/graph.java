@@ -1,14 +1,23 @@
 package tonals;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 public class graph implements Serializable {
+	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+	
 	/*
 	 * Constructs a graph representing tonals.  
 	 * Paths without choice points are collapsed into a single edge,
@@ -16,7 +25,6 @@ public class graph implements Serializable {
 	 * candidate tonals meet on either the incoming or outgoing edges
 	 * (or possibly both).
 	 */
-	
 	public boolean debug = false;
 	
 	// Graph entries and exits
@@ -28,6 +36,8 @@ public class graph implements Serializable {
 	// of entries and exits
 	private HashMap<tfnode, LinkedList<edge<tfnode, tonal>>> in;
 	private HashMap<tfnode, LinkedList<edge<tfnode, tonal>>> out;
+	
+	private ArrayList<edge<tfnode, tonal>> allEdges;
 
 	public double resolutionHz;
 	public final double graphId;
@@ -47,6 +57,7 @@ public class graph implements Serializable {
 		// initialize edge list maps
 		in = new HashMap<tfnode, LinkedList<edge<tfnode, tonal>>>();
 		out = new HashMap<tfnode, LinkedList<edge<tfnode, tonal>>>();
+		allEdges = new ArrayList<edge<tfnode, tonal>>();
 		
 		// initialize list of entries/exits
 		nodes_in = new LinkedList<tfnode>();
@@ -79,7 +90,7 @@ public class graph implements Serializable {
 	// Moderately deep copy
 	// Copy down to just above the edge level
 	private HashMap<tfnode, LinkedList<edge<tfnode, tonal>>> 
-		map_clone (HashMap<tfnode, LinkedList<edge<tfnode, tonal>>> map) {
+		map_clone(HashMap<tfnode, LinkedList<edge<tfnode, tonal>>> map) {
 		
 		HashMap<tfnode, LinkedList<edge<tfnode, tonal>>> copy;
 		if (map == null)
@@ -242,6 +253,7 @@ public class graph implements Serializable {
 			// add it to both sides 
 			edges.add(new_edge);  // outgoing
 			get_edges(in, to).add(new_edge);  // incoming
+			this.allEdges.add(new_edge);
 		}
 	}
 	
@@ -424,6 +436,7 @@ public class graph implements Serializable {
 						double fit_err_slp = fit(in_edge, out_edge, disamb_thr_s, false);
 						double fit_err_vecstr = fit_phase_vec(in_edge, out_edge, disamb_thr_s);
 						
+						
 						if (debug) {
 							System.out.printf("fitness: %s -> %s = %f\n", 
 								in.content.toString(1,1), 
@@ -431,24 +444,28 @@ public class graph implements Serializable {
 						}
 						
 						if (fit_dphase) {
+//							double fit_err_dphase = fit(in_edge, out_edge, disamb_thr_s, true);
 							scores.add(new fitness<edgepair>(
 									new edgepair(in, out), 
 									fit_err_dphase,
 									fit_err_slp
 							));
 						} else if (fit_vecstr) {
+//							double fit_err_vecstr = fit_phase_vec(in_edge, out_edge, disamb_thr_s);
 							scores.add(new fitness<edgepair>(
 									new edgepair(in, out), 
 									fit_err_vecstr,
 									fit_err_slp
 							));
 						} else {
+//							double fit_err_dphase = fit(in_edge, out_edge, disamb_thr_s, true);
 							scores.add(new fitness<edgepair>(
 									new edgepair(in, out), 
 									fit_err_slp,
 									fit_err_dphase
 							));
 						}
+						
 						// The fitness value of the to and from nodes
 						// is likely to have improved.  Add them both
 						double scoreFrom = node_fitness(in.from);
@@ -469,6 +486,7 @@ public class graph implements Serializable {
 					if (debug)
 						System.out.printf("Edge pair %s score [%f %f]: " ,
 								c.object.toString(), c.score, c.score2);
+					
 					if (c.score < Double.POSITIVE_INFINITY && viable_pair(c.object)) {
 						if (debug)
 							System.out.printf("merge\n");
@@ -546,7 +564,6 @@ public class graph implements Serializable {
 		
 		// Remove spurious edges at input/output
 		discard_spurious();
-
 	}
 	
 	/*
@@ -650,6 +667,7 @@ public class graph implements Serializable {
 		
 		FitPoly in_fit = fit(in_edge, skip_n, fit_dphase, true);
 		FitPoly out_fit = fit(out_edge, skip_n, fit_dphase, false);
+		
 		err_out = get_err(in_fit, out_edge, disamb_thr_s, skip_n, fit_dphase)
 				  / out_edge.duration();
 		err_in = get_err(out_fit, in_edge, -disamb_thr_s, skip_n, fit_dphase)
@@ -709,7 +727,7 @@ public class graph implements Serializable {
 						else
 							diff = Math.abs(prev.phase) + node.phase;
 					}
-					error = fit.sq_error(freq, diff);
+					error = fit.getSquaredErrorForPoint(freq, diff);
 					cum_error += error;
 					count++;
 				}
@@ -742,21 +760,21 @@ public class graph implements Serializable {
 						else
 							diff = Math.abs(prev.phase) + node.phase;
 					}
-					error = fit.sq_error(freq, diff);
+					error = fit.getSquaredErrorForPoint(freq, diff);
 					cum_error += error;
 					count++;
 				}
 				return cum_error / count;
 			}
 		} else {
-			error = fit.sq_error(node.time, node.freq);
+			error = fit.getSquaredErrorForPoint(node.time, node.freq);
 			cum_error = error;
 			int count = 1;
 			// iterate through list accumulating error until done
 			while (it.hasNext() & elapsed_s < how_far_s) {
 				node = it.next();
 				elapsed_s = Math.abs(start_s - node.time);
-				error = fit.sq_error(node.time, node.freq);
+				error = fit.getSquaredErrorForPoint(node.time, node.freq);
 				cum_error += error;
 				count++;
 			}
@@ -764,26 +782,42 @@ public class graph implements Serializable {
 		}
 	}
 	
-	private FitPoly fit(tonal path, int skip_n, boolean fit_dphase,
-			boolean incoming_edge) {
+	private FitPoly fit(tonal path, int skip_n, boolean fit_dphase, boolean incoming_edge) {
 		
 		final double 	 fit_thresh = .7;
 
 		int order = 1;
 		// far enough back, fit the polynomial
-		FitPoly fit = new FitPoly(order, path, skip_n, fit_dphase, incoming_edge);
+		FitPoly fit = null;
+		if (fit_dphase) {
+			fit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+		} else {
+			fit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+		}
+		
 		order = order + 1;
 		// If the bit is bad, try the next order up.  
 		// When the frequencies have a standard deviation
 		// that is somewhere near our quantization noise or
 		// if there are not enough points to get a good
 		// higher order fit, we live with the fit we have.
-		while (fit.R2 < fit_thresh && 
-				fit.std_dev > 2 * resolutionHz && 
-				path.size() > order*3) {
+//		while (fit.R2() < fit_thresh && fit.stdDev() > 2 * resolutionHz && path.size() > order*3) {
+		while (fit.getR2() < fit_thresh && path.size() > order*3 && order <= 2) {
 			// lousy fit, try again
+//			order = order + 1;
+			FitPoly newFit;
+			
+			if (fit_dphase) {
+				newFit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+			} else {
+				newFit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+			}
+			
+			if (newFit.getR2() > fit.getR2()) {
+				fit = newFit;
+			}
+			
 			order = order + 1;
-			fit = new FitPoly(order, path, skip_n, fit_dphase, incoming_edge);
 		}
 		return fit;
 	}
@@ -1133,7 +1167,25 @@ public class graph implements Serializable {
 		}
 	}
 	
+	public List<tfnode> getAllNodes() {
+		ArrayList<tfnode> allnodes = new ArrayList<tfnode>();
+		Set<tfnode> nodes = this.in.keySet();
+		allnodes.addAll(nodes);
+		
+		nodes = this.out.keySet();
+		for (Iterator<tfnode> iterator = nodes.iterator(); iterator.hasNext();) {
+			tfnode tfnode = iterator.next();
+			if (!allnodes.contains(tfnode)) {
+				allnodes.add(tfnode);
+			}
+		}
+		
+		return allnodes;
+	}
 	
+	public List<edge<tfnode,tonal>> getAllEdges() {
+		return allEdges;
+	}
 	
 	private class BridgeResult{
 		boolean modified = false;
