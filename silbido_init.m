@@ -33,6 +33,12 @@ if (~exist('tonals.tonal'))
     end
 end
 
+java_dist_dir = fullfile(RootDir, 'whistle/lib');
+java_archives = utFindFiles({'*.jar'}, {java_dist_dir}, 1);
+if ~ isempty(java_archives);
+    javaaddpath(java_archives);
+end
+
 if (~exist('tonals.tonal')) 
     error('Could not load java classes.');
 end
