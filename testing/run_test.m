@@ -4,21 +4,37 @@ if (~exist('dtTonalsSave'))
     dev_init;
 end
 
-base_dir = '/Users/michael/development/sdsu/silbido/corpora/filter_test/';
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
+import tonals.*;
+
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/filter_test/';
+base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/trouble/';
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/short_beaked/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short-test/';
 output_dir = 'testing/results/';
+
+if exist(output_dir,'dir')
+    rmdir(output_dir, 's');    
+end
+
 test_files = getAllFiles(base_dir, '.wav');
 
-for i=1:size(test_files,1)
+for i = 1:size(test_files,1)
     input_file = test_files{i};
+    fprintf('Tracking Tonals for file %s ...', input_file);
+    [detectedTonals, graphs] = dtTonalsTracking(input_file,0,Inf);
+    
     [path, name, ~] = fileparts(input_file);
     rel_path = path(size(base_dir,2)+1:end);
-    output_file = fullfile(output_dir,rel_path,strcat(name, '.det'));
     mkdir(fullfile(output_dir, rel_path));
-    fprintf('Tracking Tonals for file %s ...', input_file);
-    tonals = dtTonalsTracking(input_file,0,Inf);
-    dtTonalsSave(output_file, tonals);
+    
+    output_file_base = fullfile(output_dir,rel_path,name);
+    det_file = strcat(output_file_base, '.det');
+    graph_file = strcat(output_file_base, '.graph');
+    
+    tonals.GraphIO.saveGraphs(graphs, graph_file);
+    dtTonalsSave(det_file, detectedTonals);
     fprintf('Completed.\n');
 end
 
