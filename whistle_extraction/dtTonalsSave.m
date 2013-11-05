@@ -25,7 +25,7 @@ import tonals.*;
 
 error(nargchk(2,4,nargin));
 if nargin < 4
-    savemask = TonalHeader.DEFAULT;
+    savemask = bitor(bitor(bitor(TonalHeader.TIME, TonalHeader.FREQ), TonalHeader.RIDGE), TonalHeader.SNR);
     if nargin < 3
         gui = isempty(Filename);  % Only use the gui if filename empty
     end
