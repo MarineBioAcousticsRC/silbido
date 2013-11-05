@@ -26,7 +26,7 @@ function varargout = dtTonalAnnotate(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 22-Jun-2012 10:01:35
+% Last Modified by GUIDE v2.5 06-Oct-2013 14:11:15
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -54,7 +54,7 @@ end
 
 % --- Executes just before dtTonalAnnotate is made visible.
 function handles = dtTonalAnnotate_OpeningFcn(hObject, eventdata, handles, ...
-    Filename, varargin)
+    varargin)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -63,7 +63,7 @@ function handles = dtTonalAnnotate_OpeningFcn(hObject, eventdata, handles, ...
 %            See file header for list
 
 % Verify correct number of inputs
-error(nargchk(4,Inf,nargin));
+%error(nargchk(4,Inf,nargin));
 % Choose default command line output for dtTonalAnnotate
 handles.output = hObject;
 
@@ -96,31 +96,11 @@ data.SmoothSplineKnots = 8;
 data.SmoothPolyOrder = 3;
 data.EditKnots = data.SmoothSplineKnots;  % edit as spline
 
-if isempty(Filename)
-    [Filename, FileDir] = uigetfile('.wav', 'Develop ground truth for file');
-    if isnumeric(Filename)
-        fprintf('User abort\n');
-        return
-    else
-        data.Filename = fullfile(FileDir, Filename);
-        cd(FileDir);
-    end
-else
-    data.Filename = Filename;
-end
+data.Mode = 'annotate';
 
-[fdir, fname] = fileparts(data.Filename);
-data.hdr = ioReadWavHeader(data.Filename);
-% defaults
-data.Start_s = 0;
-data.Stop_s = data.hdr.Chunks{data.hdr.dataChunk}.nSamples/data.hdr.fs;
-data.RemoveTransients = false;
+Filename = '';
+data.RelativeFilePath = '';
 
-data.annotations = java.util.LinkedList(); % empty list of annotations
-
-data.operation = [];
-
-data.FigureTitle = '';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % processs arguments
@@ -128,6 +108,26 @@ data.FigureTitle = '';
 k = 1;
 while k <= length(varargin)
     switch varargin{k}
+        case 'Mode'
+            data.Mode = varargin{k+1};
+            k=k+2;
+        
+        case 'Filename'
+            Filename = varargin{k+1};
+            k=k+2;
+            
+        case 'CorpusBaseDir'
+            data.CorpusBaseDir = varargin{k+1};
+            k=k+2;
+            
+        case 'ScoringBaseDir'
+            data.ScoringBaseDir = varargin{k+1};
+            k=k+2;
+            
+        case 'RelativeFilePath'
+            data.RelativeFilePath = varargin{k+1};
+            k=k+2;
+            
         case 'ParameterSet'
             k=k+2;  % handled earlier (must be processed first)
             
@@ -153,6 +153,12 @@ while k <= length(varargin)
                     data.annotations.add(a_tonal.clone());
                 end
             end
+            k=k+2;
+            
+        case 'Ground'
+            % User's graphs
+            % todo
+            data.all_graphs = varargin{k+1};
             k=k+2;
 
         case 'Framing'
@@ -191,7 +197,7 @@ while k <= length(varargin)
             else
                 set(handles.ViewLength_s, 'String', num2str(length_s));
             end
-        case 'Title';
+        case 'Title'
             FigureTitle = varargin{k+1}; k=k+2;
             if ~ ischar(FigureTitle)
                 error('Title argument must be a character string');
@@ -211,6 +217,49 @@ while k <= length(varargin)
             error('%s', errstr);
     end
 end
+
+
+% TODO Abstract this.
+if (strcmp(data.Mode, 'annotate') == 1)
+    if isempty(Filename)
+        [Filename, FileDir] = uigetfile('.wav', 'Develop ground truth for file');
+        if isnumeric(Filename)
+            fprintf('User abort\n');
+            close();
+            return
+        else
+            data.Filename = fullfile(FileDir, Filename);
+            cd(FileDir);
+        end
+
+    else
+        data.Filename = Filename;
+    end
+else        
+    if (isempty(data.RelativeFilePath))
+        [accepted, corupus_rel_path] = corpus_file_chooser(data.CorpusBaseDir);
+        if (accepted)
+            data.RelativeFilePath = corupus_rel_path;
+        end
+    end
+    
+    data.Filename = fullfile(data.CorpusBaseDir, data.RelativeFilePath);
+end
+
+
+[fdir, fname] = fileparts(data.Filename);
+data.hdr = ioReadWavHeader(data.Filename);
+% defaults
+data.Start_s = 0;
+data.Stop_s = data.hdr.Chunks{data.hdr.dataChunk}.nSamples/data.hdr.fs;
+data.RemoveTransients = false;
+
+data.annotations = java.util.LinkedList(); % empty list of annotations
+
+data.operation = [];
+
+data.FigureTitle = '';
+
 data.ms_per_s = 1000;
 data.thr.advance_s = data.thr.advance_ms / data.ms_per_s;
 
@@ -234,6 +283,8 @@ data.LastSave = 0;  % Used for tracking if the tonals have been modified
 
 % Handles
 handles.Rendered = [];  % plotted tonals
+handles.RenderedRidgePoints = [];  % plotted tonals
+handles.RenderedGraphs = [];  % plotted tonals
 handles.Selected = [];  % selected tonals (subset of Tonals)
 handles.Points = [];  % draggable points
 handles.Preview = []; % preview of spline under construction
@@ -266,8 +317,14 @@ end
 %%handles = guidata(handles.Annotation); % pick up any changes from plotting
 %operation_Callback(handles.operation, [], handles);
 data = get(handles.Annotation, 'UserData');
+if (strcmp(data.Mode, 'analyze') == 1 && ~isempty(data.Filename))
+    [scored_path, ~, ~] = fileparts(fullfile(data.ScoringBaseDir, data.RelativeFilePath));
+    data = process_scored_detections_dir(data, scored_path);
+end
+
 [handles, data] = spectrogram(handles, data);
 SaveDataInFigure(handles, data);
+
                     
 % --- Outputs from this function are returned to the command line.
 function varargout = dtTonalAnnotate_OutputFcn(hObject, eventdata, handles) 
@@ -717,7 +774,6 @@ function High_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
 
 
 function Low_Callback(hObject, eventdata, handles)
@@ -1353,7 +1409,7 @@ if ishandle(handle)
         restore = true;
     catch e
         % object does not have a background color,
-        % e.g. a toolbar widget.  Use something else...
+        % e.g. a open widget.  Use something else...
         color = get(handles.Commit, 'BackgroundColor');
         restore = false;
     end
@@ -1376,6 +1432,22 @@ if ishandle(handle)
         set(handle, 'BackgroundColor', color);
     end
 end
+
+function graphSelectioncallback(hObject, eventdata, varargin)
+    figureH = gcbf;
+    handles = guidata(figureH);
+    axisposn = get(handles.spectrogram, 'Position');
+    % Error message should be in a box spanning the axis
+    % and about 10% of its height at and plotted high on the axis
+    errposn = axisposn;
+    errposn(4) = errposn(4) * .1;  % height
+    errposn(2) = errposn(2) + axisposn(4)*.7;
+    errH = uicontrol(handles.Annotation, 'Style', 'text', 'Position', errposn, ...
+        'BackgroundColor', 'y', 'String', 'sdfsaf', ...
+        'Units', 'normalized', 'FontSize', 14, ...
+        'HorizontalAlignment', 'center');
+    pause(3);
+    delete(errH);
 
 function found = tonal_rm(iterable_tonals, a_tonal)
 % Remove a tonal from iterable_tonals
@@ -1425,8 +1497,14 @@ function load_Annotations(hObject, eventdata, handles)
 data = get(handles.Annotation, 'UserData');
 % Load in the annotations.  Make sure to pick up the name
 % the user selected as they may have changed it.
-[tonal_set, header, annotfile] = ...
-    dtTonalsLoad(data.AnnotationFile, true);
+[tonal_set, header, annotfile] = dtTonalsLoad(data.AnnotationFile, true);
+process_loaded_tonals(hObject, handles, tonal_set, annotfile);
+
+
+function process_loaded_tonals(hObject, handles,tonal_set, annotfile)
+
+data = get(handles.Annotation, 'UserData');
+
 if ~isempty(tonal_set) && tonal_set.size() > 0
     % Only replace existing tonals if user loaded new ones
     data = clear_History(data);
@@ -1588,37 +1666,51 @@ function openAudioFile_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % TODO:  Add warning if there are unsaved annotatations as they will be lost
+data = get(handles.Annotation, 'UserData');
 
-[Filename, FileDir] = uigetfile('.wav', 'Audio file to create/view annotations');
-if isnumeric(Filename)
-    return
-else
-    data = get(handles.Annotation, 'UserData');
-    data.Filename = fullfile(FileDir, Filename);
-    %cd(FileDir);
-    data.hdr = ioReadWavHeader(data.Filename);
-    % defaults
-    data.Start_s = 0;
-    data.Stop_s = data.hdr.Chunks{data.hdr.dataChunk}.nSamples/data.hdr.fs;
-    data.AnnotationFile = AudioFname2Tonal(data.Filename);
-    
-    % Clear out any existing selections/operations in progress
-    handles = ReleaseSelections_Callback(hObject, eventdata, handles);
-    handles = ReleasePoints(handles);
-    
-    % Remove all tonals and editing history
-    data.annotations = java.util.LinkedList(); % empty list of annotations
-    data.undo = struct('before', {}, 'after', {});
-
-    % Make sure current point is not past end of file
-    % We don't set the start to 0 in case the user wants
-    % to look at the same point in similar files.
-    newstart_s = start_in_range(data.Start_s, handles, data);
-    data.Start_s = newstart_s;
-    set(handles.Start_s, 'String', num2str(newstart_s));
-    [handles, data] = spectrogram(handles, data)
-    SaveDataInFigure(handles, data);
+if (strcmp(data.Mode, 'annotate') == 1)
+    [Filename, FileDir] = uigetfile('.wav', 'Audio file to create/view annotations');
+    if isnumeric(Filename)
+        return;
+    else
+        data.Filename = fullfile(FileDir, Filename);
+        cd(FileDir);
+    end
+else        
+    [accepted, corupus_rel_path] = corpus_file_chooser(data.CorpusBaseDir);
+    if (accepted)
+        data.RelativeFilePath = corupus_rel_path;
+        data.Filename = fullfile(data.CorpusBaseDir, corupus_rel_path);
+        [scored_path, ~, ~] = fileparts(fullfile(data.ScoringBaseDir, data.RelativeFilePath));
+        data = process_scored_detections_dir(data, scored_path);
+    else
+        return;
+    end
 end
+ 
+
+data.hdr = ioReadWavHeader(data.Filename);
+% defaults
+data.Start_s = 0;
+data.Stop_s = data.hdr.Chunks{data.hdr.dataChunk}.nSamples/data.hdr.fs;
+data.AnnotationFile = AudioFname2Tonal(data.Filename);
+
+% Clear out any existing selections/operations in progress
+handles = ReleaseSelections_Callback(hObject, eventdata, handles);
+handles = ReleasePoints(handles);
+
+% Remove all tonals and editing history
+data.annotations = java.util.LinkedList(); % empty list of annotations
+data.undo = struct('before', {}, 'after', {});
+
+% Make sure current point is not past end of file
+% We don't set the start to 0 in case the user wants
+% to look at the same point in similar files.
+newstart_s = start_in_range(data.Start_s, handles, data);
+data.Start_s = newstart_s;
+set(handles.Start_s, 'String', num2str(newstart_s));
+[handles, data] = spectrogram(handles, data)
+SaveDataInFigure(handles, data);
 
 
 % --------------------------------------------------------------------
@@ -1908,7 +2000,7 @@ colormap(data.SpecgramColormap);
 % minimum value may be set < 0 for knot editing
 % make sure spectrogram is >= 0
 low_spec_Hz = max(0, data.low_disp_Hz);
-[axisH, handles.image, handles.colorbar] = ...
+[axisH, handles.image, handles.colorbar, snr_dB] = ...
             dtPlotSpecgram(data.Filename, blkstart_s, blkstop_s, ...
             'Contrast_Pct', contrast, 'Brightness_dB', brightness, ...
             'Axis', spH, ...
@@ -1922,6 +2014,8 @@ if data.low_disp_Hz < low_spec_Hz
     set(axisH, 'YLim', ...
         [data.low_disp_Hz/data.scale, data.high_disp_Hz/data.scale]);
 end
+
+data.snr_dB = snr_dB;
         
 % Has user enabled thresholding?
 threshold_p = get(handles.ThresholdEnable, 'Value');
@@ -1949,6 +2043,9 @@ if ~isempty(handles.image)
     set(handles.image, 'ButtonDownFcn', @select_or_add);
 end
 [handles, data] = plot_tonals(handles, data);
+if isfield(data, 'all_graphs')
+    [handles, data] = plot_graphs(handles, data);
+end
 set(handles.Annotation, 'Pointer', pointer);
 
 
@@ -1971,7 +2068,7 @@ end
 xrange = get(handles.spectrogram, 'XLim');
 % Create a fake tonal spanning the plotted area and ask for overlaps
 import tonals.*;
-phony = tonal(xrange, [data.thr.low_cutoff_Hz, data.thr.high_cutoff_Hz]);
+phony = tonal(xrange, [data.thr.low_cutoff_Hz, data.thr.high_cutoff_Hz], 0);
 overlap = phony.overlapping_tonals(data.annotations);
 
 % update the annotation movement controls
@@ -1979,6 +2076,8 @@ updateAnnotationLabel(handles, data.annotations);
 
           
 handles.Rendered = zeros(overlap.size(), 1);
+handles.RenderedRidgePoints = zeros(overlap.size(), 1);
+
 it = overlap.iterator();
 tidx = 0;
 while it.hasNext()
@@ -1991,7 +2090,7 @@ while it.hasNext()
     if ~ isempty(sidx)
         handles.Rendered(tidx) = handles.Selected(sidx);
     else
-        [handles.Rendered(tidx), data] = ...
+        [handles.Rendered(tidx), handles.RenderedRidgePoints(tidx), data] = ...
             plot_tonal(otonal, handles, data);
     end
 end
@@ -2000,8 +2099,10 @@ if strcmp(get(handles.ViewAnnotations, 'State'), 'off')
     ViewAnnotations_OffCallback(handles.ViewAnnotations, [], handles);
 end
 
+
+
 % --------------------------------------------------------------------
-function [tonal_h, data] = plot_tonal(a_tonal, handles, data)
+function [tonal_h, tonal_r_h, data] = plot_tonal(a_tonal, handles, data)
 % plot a tonal and return a handle to the rendered tonal
 % tonal_no indicates the position of the tonal in some list
 % and handles, and data are used to determine the plot characteristics
@@ -2009,11 +2110,17 @@ function [tonal_h, data] = plot_tonal(a_tonal, handles, data)
 
 t = a_tonal.get_time();
 f = a_tonal.get_freq() / data.scale;
+
 tonal_h = plot(t, f, 'LineStyle', data.LineStyle, ...
     'Color', data.AnnotationColormap(data.AnnotationColorNext, :), ...
     'LineWidth', data.LineWidth, data.MarkerProps{:}, ... 
     'ButtonDownFcn', @selectTonal_Callback);
 set(tonal_h, 'UserData', a_tonal);  % Save the tonal itself
+
+r = a_tonal.get_ridge();
+rt = t(find(r==1));
+rf = f(find(r==1));
+tonal_r_h = scatter(rt, rf);
 
 % Next plot color
 data.AnnotationColorNext = ...
@@ -2030,6 +2137,7 @@ else
     max_s = -Inf;
     for idx=1:length(handles.Selected)
         t = get(handles.Selected(idx), 'XData');
+        f = get(handles.Selected(idx), 'YData') * 1000;
         min_s = min(min_s, min(t));
         max_s = max(max_s, max(t));
     end
@@ -2433,9 +2541,6 @@ if ~ isempty(handles.Selected)
 end
 
 
-
-
-
 % --------------------------------------------------------------------
 function save_Annotations(hObject, eventdata, handles)
 % hObject    handle to save (see GCBO)
@@ -2665,3 +2770,281 @@ function HelpScoring_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 dir = fileparts(mfilename);
 open(fullfile(dir, 'docs', 'Scoring.pdf'));
+
+
+% --- Executes on selection change in annotationsCombo.
+function annotationsCombo_Callback(hObject, eventdata, handles)
+% hObject    handle to annotationsCombo (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+updateDisplayedAnnotations(hObject, eventdata, handles);
+
+
+function updateDisplayedAnnotations(hObject, eventdata, handles)
+data = get(handles.Annotation, 'UserData');
+
+comboValue = get(handles.annotationsCombo,'Value');
+allTonals = get(handles.allTonalsRadio,'Value');
+
+switch(comboValue)
+    
+    case 1
+        fileName = data.resultAnnotations.det;
+        
+    case 2
+        if (allTonals > 0)
+            fileName = data.resultAnnotations.a_d_plus;
+        else
+            fileName = data.resultAnnotations.s_d_plus;
+        end
+    case 3
+        fileName = data.resultAnnotations.d_minus;
+        
+    case 4
+        fileName = data.resultAnnotations.bin;
+        
+    case 5
+        if (allTonals > 0)
+            fileName = data.resultAnnotations.a_gt_plus;
+        else
+            fileName = data.resultAnnotations.s_gt_plus;
+        end
+    case 6
+        if (allTonals > 0)
+            fileName = data.resultAnnotations.a_gt_minus;
+        else
+            fileName = data.resultAnnotations.s_gt_minus;
+        end
+    otherwise
+end
+[tonal_set, ~, annotfile] = dtTonalsLoad(fileName, false);
+process_loaded_tonals(hObject, handles, tonal_set, annotfile);
+
+% --- Executes during object creation, after setting all properties.
+function annotationsCombo_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to annotationsCombo (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --------------------------------------------------------------------
+function loadScoredAnnotatios_Callback(hObject, eventdata, handles)
+% hObject    handle to loadScoredAnnotatios (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    comboValues ={};
+    
+    scoredFolder = uigetdir(path,'Load scored results');
+    process_scored_detections_dir(handles, scoredFolder);
+    
+function [UserData] = process_scored_detections_dir(UserData, scoredFolder)
+    
+    [path, name, ~] = fileparts(UserData.Filename);
+    basefile = fullfile(scoredFolder,name);
+
+    resultAnnotations = struct();
+    resultAnnotations.bin =       [path '/' name '.bin']; % All detections;
+    resultAnnotations.det =       [basefile '.det'];      % All detections;
+    resultAnnotations.d_minus =   [basefile '.d-'];       % False posative
+    
+    resultAnnotations.a_d_plus =  [basefile '_a.d+'];     % Good detection
+    resultAnnotations.s_d_plus =  [basefile '_s.d+'];     % Good detection
+
+    resultAnnotations.a_gt_plus =  [basefile '_s.gt+'];   % Ground truth that was detected
+    resultAnnotations.s_gt_plus =  [basefile '_a.gt+'];   % Ground truth that was detected
+
+    resultAnnotations.a_gt_minus = [basefile '_a.gt-'];   % missed ground truth
+    resultAnnotations.s_gt_minus =  [basefile '_s.gt-'];  % missed ground truth
+   
+    UserData.resultAnnotations = resultAnnotations;
+    graphs_file = [basefile '.graph'];
+    
+    import tonals.*;
+    UserData.all_graphs = tonals.GraphIO.loadGraphs(graphs_file);
+
+
+    % --------------------------------------------------------------------
+function [handles, data] = plot_graphs(handles, data)
+% [handles, data] = plot_tonals(handles, data)
+% Plot tonals overlapping the current display
+
+xrange = get(handles.spectrogram, 'XLim');
+% Create a fake tonal spanning the plotted area and ask for overlaps
+import tonals.*;
+
+handles.RenderedGraphs = [];
+for gidx = 0:(data.all_graphs.size() - 1)
+   graph = data.all_graphs.get(gidx);
+   olap = graph.overlaps(xrange(1), xrange(2));
+   if (olap)
+      tonals = graph.topological_sort(); 
+      for tidx = 0:(tonals.size() - 1)
+          a_tonal = tonals.get(tidx).content;
+          t = a_tonal.get_time();
+          f = a_tonal.get_freq() / data.scale;
+          tonal_h = plot(t, f, 'LineStyle', data.LineStyle, ...
+            'Color', data.AnnotationColormap(data.AnnotationColorNext, :), ...
+            'LineWidth', data.LineWidth, data.MarkerProps{:}, ...
+            'LineStyle', '-.', ...
+            'ButtonDownFcn', @graphSelectioncallback);
+          handles.RenderedGraphs = [handles.RenderedGraphs tonal_h];
+          set(tonal_h, 'UserData', a_tonal);  % Save the tonal itself  
+      end
+      % Next plot color
+        data.AnnotationColorNext = ...
+            rem(data.AnnotationColorNext, data.AnnotationColorN)+1;
+ 
+   end
+end
+
+if strcmp(get(handles.ViewGraphs, 'State'), 'off')
+    ViewGraphs_OffCallback(handles.ViewAnnotations, [], handles);
+end
+
+
+    
+% --------------------------------------------------------------------
+function ViewGraphs_OffCallback(hObject, eventdata, handles)
+% hObject    handle to ViewGraphs (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~ isempty(handles.RenderedGraphs)
+    set(handles.RenderedGraphs, 'Visible', 'off');
+end
+
+
+
+% --------------------------------------------------------------------
+function ViewGraphs_OnCallback(hObject, eventdata, handles)
+% hObject    handle to ViewGraphs (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if ~ isempty(handles.RenderedGraphs)
+    set(handles.RenderedGraphs, 'Visible', 'on');
+end
+
+
+% --------------------------------------------------------------------
+function ViewRidges_ClickedCallback(hObject, eventdata, handles)
+% hObject    handle to ViewRidges (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+data = get(handles.Annotation, 'UserData');
+
+ridge_guassian_width = 2;
+ridge_spectrogram = data.snr_dB;
+derivatives = struct;
+derivatives.guassian_width = ridge_guassian_width;
+derivatives.gx  = gfilter(filtered_spectrogram,ridge_guassian_width,[0 1]);
+derivatives.gy  = gfilter(filtered_spectrogram,ridge_guassian_width,[1 0]);
+derivatives.gxx = gfilter(filtered_spectrogram,ridge_guassian_width,[0 2]);
+derivatives.gyy = gfilter(filtered_spectrogram,ridge_guassian_width,[2 0]);
+derivatives.gxy = gfilter(filtered_spectrogram,ridge_guassian_width,[2 2]);
+derivatives.gyx = derivatives.gxy;
+
+figure;
+          bright_dB = 10;
+          contrast_Pct = 200;
+          
+          fHz = 5000:125:50000;
+          cb.fkHz = fHz / 1000;
+          cb.time_scale = time_scale;
+           
+          
+          I = ridge_spectrogram;
+         
+          dims = size(ridge_spectrogram);
+          
+          image_h = image(ridge_spectrogram);
+          set(gca,'YDir','normal');
+          colorData = (contrast_Pct/100) .* ridge_spectrogram + bright_dB;
+          set(image_h, 'CData', colorData);
+
+          colormap(gray);
+          hold on;
+          [~, cb.ridgesH] = contour(ridge_spectrogram,'c');
+
+          % We are only going to plot a subset of points on the graph
+          % set 'step_size' to x to plot every 'xth' point.
+          step_size = 3;
+          y_steps = 1:step_size:dims(1);
+          x_steps = 1:step_size:dims(2);
+          [X, Y] = meshgrid(x_steps, y_steps); 
+        
+         
+          % Create containers to hold the gradient vectors and dominant
+          % Eigen vectors of the Hessian matrix.
+          gv_x = ones(dims) * NaN;
+          gv_y = ones(dims) * NaN;
+
+          ev_x = ones(dims) * NaN;
+          ev_y = ones(dims) * NaN;
+
+          % For each selected point in the x and y calculate the gv and
+          % ev.
+          for idx_x = 1:length(x_steps)
+            for idx_y = 1:length(y_steps)
+                x = x_steps(idx_x);
+                y = y_steps(idx_y);
+
+                [a, gv, ev] = HessianFunctional(derivatives, y, x, 0);   
+
+                gv_x(y, x) = gv(1);
+                gv_y(y, x) = gv(2);
+
+                % The gv and ev can have vastly different magnitudes.
+                % While less accurate, it is more visually inuitive to
+                % scale the ev to the same length as the ev.
+                gv_mag = norm([gv_x(y,x) gv_y(y,x)]);
+                scaling = gv_mag / norm(ev);
+                ev = ev * abs(scaling);
+
+                ev_x(y, x) = ev(1);
+                ev_y(y, x) = ev(2);
+
+            end        
+         end
+
+         GV_X = gv_x(y_steps,x_steps);
+         GV_Y = gv_y(y_steps,x_steps);
+         quiver(X(:),Y(:),GV_X(:),GV_Y(:), 'g');
+
+         EV_X = ev_x(y_steps,x_steps);
+         EV_Y = ev_y(y_steps,x_steps);
+         quiver(X(:),Y(:),EV_X(:),EV_Y(:), 'y');
+         
+         axis off
+
+         % This uses the original ridge tracking code to plot all ridges in
+         % red.
+         [TT, A] = CalculateFunctionalsAndTrackNew(I,derivatives.guassian_width,zeros(size(I)),5);
+         TT = SmoothCurves2(TT,2,1000);
+        
+         for n = 1:length(TT)
+            T = TT{n};
+            plot(T(:, 1), T(:, 2),'r', 'LineWidth', 3);
+         end
+
+% --- Executes when selected object is changed in detectionButtonGroup.
+function detectionButtonGroup_SelectionChangeFcn(hObject, eventdata, handles)
+% hObject    handle to the selected object in detectionButtonGroup 
+% eventdata  structure with the following fields (see UIBUTTONGROUP)
+%	EventName: string 'SelectionChanged' (read only)
+%	OldValue: handle of the previously selected object or empty if none was selected
+%	NewValue: handle of the currently selected object
+% handles    structure with handles and user data (see GUIDATA)
+updateDisplayedAnnotations(hObject, eventdata, handles);
+
+
+% --------------------------------------------------------------------
+function quit_Callback(hObject, eventdata, handles)
+% hObject    handle to quit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+close();
