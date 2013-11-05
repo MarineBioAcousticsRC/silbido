@@ -32,17 +32,30 @@ dft = zeros(range_binsN, last_frame);
 power_dB = zeros(range_binsN, last_frame);
 
 window = hamming(Length);
+%window = blackmanharris(Length);
 for frameidx = 1:last_frame
-  dft_frame = fft(spFrameExtract(Signal,Indices,frameidx).*window);
+  frame = spFrameExtract(Signal,Indices,frameidx);
+  
+  dft_frame = fft(frame.*window);
   dft(:,frameidx) = dft_frame(Range);
-  power_dB(:,frameidx) = 20*log10(abs(dft(:,frameidx)));
+  
+  frame_mag = abs(dft(:,frameidx));
+  frame_mag(frame_mag <= eps) = 10*eps;
+  %frame_mag(frame_mag == 0) = 0;
+  
+  power_dB(:,frameidx) = 20*log10(frame_mag);
+  %power_dB(:,frameidx) = 20*log10(abs(dft(:,frameidx)));
 end
 
 meanf_dB = mean(power_dB, 2);
 for frameidx = 1:last_frame
+  % Calculate how many frequency bins are greater than ClickThr_dB
+  % above the mean of the frame.  If this count is greater than
+  % BroadbandThrN, mark the frame as a click.
   clickP(frameidx) = ...
       sum((power_dB(:,frameidx) - meanf_dB) > ClickThr_dB) ...
       > BroadbandThrN;
+  % add an or for detecting signifigant troughs.
 end
 
 % Estimate noise and remove via spectral means subtraction
@@ -50,4 +63,5 @@ end
 if ~ iscell(NoiseComp)
     NoiseComp = {NoiseComp};
 end
+
 snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp{:}, ~clickP);
