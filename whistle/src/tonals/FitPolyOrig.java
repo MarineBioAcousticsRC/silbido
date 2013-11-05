@@ -179,7 +179,7 @@ public class FitPolyOrig implements FitPoly {
 			try {
 				param_matrix = alpha_QRD.solve (beta_matrix);
 			} catch (Exception e) {
-				System.out.println ("QRD solve failed: "+ e);
+				//System.out.println ("QRD solve failed: "+ e);
 				return;
 			}
 
@@ -189,7 +189,7 @@ public class FitPolyOrig implements FitPoly {
 			try {
 				c = alpha_matrix.inverse ();
 			} catch (Exception e) {
-				System.out.println ("QRD solve failed: "+ e);
+				//System.out.println ("QRD solve failed: "+ e);
 				return;
 			}
 

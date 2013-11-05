@@ -229,8 +229,6 @@ public class graph implements Serializable {
 	 * @param - path
 	 */
 	void add_edge(tfnode from, tfnode to, tonal path) {
-		
-		
 		// check if outgoing edge is already in graph.
 		// we only need to check in one direction as we are assuming
 		// bidirectional edges
@@ -341,13 +339,12 @@ public class graph implements Serializable {
 
 	}
 	
-	public graph disambiguate(double disamb_thr_s, double resolutionHz, 
-			boolean fit_dphase, boolean fit_vecstr, boolean use_ridges, double ridge_thresh) {
+	public graph disambiguate(double disamb_thr_s, double resolutionHz, boolean use_ridges, double ridge_thresh) {
 		// Create a moderately deep copy of this graph.
 		// The edge containers have fresh copies, but the edges
 		// and nodes are shared.
 		graph copy = new graph(this, this.graphId);
-		copy.compress(disamb_thr_s, resolutionHz, fit_dphase, fit_vecstr);
+		copy.compress(disamb_thr_s, resolutionHz);
 		if (use_ridges) {
 			copy.process_bridges(ridge_thresh);
 		}
@@ -363,8 +360,7 @@ public class graph implements Serializable {
 	 * @param fit_dphase - boolean for considering first phase difference
 	 * @param fit_vecstr - boolean for considering vector strength method
 	 */
-	void compress(double disamb_thr_s, double resolutionHz, boolean fit_dphase,
-			boolean fit_vecstr) {
+	void compress(double disamb_thr_s, double resolutionHz) {
 		debug = false;
 		if (debug) {
 			System.out.printf("compress graph: *************************** \n%s\n", this.toString());
@@ -419,8 +415,7 @@ public class graph implements Serializable {
 					multicopy = true;
 			}
 			
-			if (incoming != null && 
-					incoming.size() >= 1 && outgoing.size() >= 1) { 
+			if (incoming != null && incoming.size() >= 1 && outgoing.size() >= 1) { 
 				// Junction
 				// Retrieve the incoming and outgoing edge lists
 				scores.clear();		// empty out any previous scores
@@ -434,7 +429,6 @@ public class graph implements Serializable {
 						// Error calculation
 						double fit_err_dphase = fit(in_edge, out_edge, disamb_thr_s, true);
 						double fit_err_slp = fit(in_edge, out_edge, disamb_thr_s, false);
-						double fit_err_vecstr = fit_phase_vec(in_edge, out_edge, disamb_thr_s);
 						
 						
 						if (debug) {
@@ -443,28 +437,11 @@ public class graph implements Serializable {
 								out.content.toString(1,1), fit_err_slp);
 						}
 						
-						if (fit_dphase) {
-//							double fit_err_dphase = fit(in_edge, out_edge, disamb_thr_s, true);
-							scores.add(new fitness<edgepair>(
-									new edgepair(in, out), 
-									fit_err_dphase,
-									fit_err_slp
-							));
-						} else if (fit_vecstr) {
-//							double fit_err_vecstr = fit_phase_vec(in_edge, out_edge, disamb_thr_s);
-							scores.add(new fitness<edgepair>(
-									new edgepair(in, out), 
-									fit_err_vecstr,
-									fit_err_slp
-							));
-						} else {
-//							double fit_err_dphase = fit(in_edge, out_edge, disamb_thr_s, true);
-							scores.add(new fitness<edgepair>(
-									new edgepair(in, out), 
-									fit_err_slp,
-									fit_err_dphase
-							));
-						}
+						scores.add(new fitness<edgepair>(
+								new edgepair(in, out), 
+								fit_err_slp,
+								0//fit_err_dphase
+						));
 						
 						// The fitness value of the to and from nodes
 						// is likely to have improved.  Add them both
@@ -801,8 +778,8 @@ public class graph implements Serializable {
 		// that is somewhere near our quantization noise or
 		// if there are not enough points to get a good
 		// higher order fit, we live with the fit we have.
-//		while (fit.R2() < fit_thresh && fit.stdDev() > 2 * resolutionHz && path.size() > order*3) {
-		while (fit.getR2() < fit_thresh && path.size() > order*3 && order <= 2) {
+		while (fit.getR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && path.size() > order*3) {
+//		while (fit.getAdjustedR2() < fit_thresh && path.size() > order*3) {
 			// lousy fit, try again
 //			order = order + 1;
 			FitPoly newFit;
@@ -810,10 +787,10 @@ public class graph implements Serializable {
 			if (fit_dphase) {
 				newFit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
 			} else {
-				newFit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+				newFit = new FitPolyJama(order, path, skip_n, fit_dphase, incoming_edge);
 			}
 			
-			if (newFit.getR2() > fit.getR2()) {
+			if(newFit.getAdjustedR2() > fit.getAdjustedR2()){
 				fit = newFit;
 			}
 			

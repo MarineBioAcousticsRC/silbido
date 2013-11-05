@@ -39,7 +39,13 @@ public class FitPolyJama extends FitPolyBase {
 			beta.set(0, 0, y[0]);
 			this.degree = 0;
 		} else {
-		
+			
+			// A little trick is that the degree must be less than the
+			// number of points that you have to construct the fit with.
+			// The min just ensures that this will be the case;
+			
+			this.degree = Math.min(x.length - 2, this.degree);
+			
 	        // build Vandermonde matrix
 	        double[][] vandermonde = new double[numObservations][degree+1];
 	        for (int i = 0; i < numObservations; i++) {
