@@ -67,6 +67,30 @@ Interactive = false;
 Debug = false;
 
 
+% Ridge Tracker Settings
+% Potentially move to dtThresh
+ridge_tracking_enabled = false;
+ridge_percentage = .5;
+ridge_closeness_thresh = 2; % <=
+ridge_guassian_width = 2;
+ridge_min_length = 17; % # of points
+ridge_forward_only = 1;
+% TODO horizontal priority.
+
+%ridge_peak_mode = 'ridge_priority';
+%ridge_peak_mode = 'peak_priority';
+%ridge_peak_mode = 'peaks_only';
+ridge_peak_mode = 'non_ridge_only';
+
+ridge_tracking_hp_thresh = 0;
+ridge_tracking_lp_thresh = 0;
+ridge_tracking_isd = 1; % Interest threashold in number of std dev above noise.
+ridge_tracking_adaptive_filter = 0; % Adaptive histogram
+ridge_tracking_bandpass_filter = 1; 
+ridge_tracking_click_filter = 0;
+ridge_tracking_use_mask = 0;
+
+
 if ~iscell(Filenames)
     if isempty(Filenames)
         % add GUI filenames selection later
@@ -264,7 +288,7 @@ end
 MovieH = [];  % open movie file
 if Plot
     [notused ImageH]= dtPlotSpecgram(Filenames{file_idx}, Start_s, Stop_s, ...
-        'Framing', [Advance_ms, Length_ms], 'Render', 'floor', ...
+        'Framing', [thr.advance_ms, thr.length_ms], 'Render', 'floor', ...
         'Range', [thr.low_cutoff_Hz thr.high_cutoff_Hz], ...
         'Threshold', thr.whistle_dB, 'Click_dB', thr.click_dB, ...
         'Noise', NoiseSub);
@@ -314,7 +338,7 @@ Nyquist_bin = floor(Length_samples/2);
 correction_dB = -10*log10(sum(window)^2) - 3; % correction for window energy
 bin_Hz = header.fs / Length_samples;    % Hz covered by each freq bin
 bin_kHz = bin_Hz / 1000;  % for plotting purposes
-active_set.resolutionHz = bin_Hz;
+active_set.setResolutionHz(bin_Hz);
 thr.high_cutoff_bins = min(ceil(thr.high_cutoff_Hz/bin_Hz)+1, Nyquist_bin);
 thr.low_cutoff_bins = ceil(thr.low_cutoff_Hz / bin_Hz)+1;
 % After discretization, the low frequency cutoff may be different than
@@ -366,54 +390,67 @@ StartBlock_s = Start_s;
 % time needed for determining the phase.
 while StartBlock_s + 2 * Length_s < Stop_s
 
-   % Retrieve the data for this block
-   StopBlock_s = min(StartBlock_s + block_padded_s, Stop_s);
-   Signal = ioReadWav(handle, header, StartBlock_s, StopBlock_s, ...
-       'Units', 's', 'Channels', channel);
-   % Perform spectral analysis on block
-   [power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
-       Length_samples, Advance_samples, shift_samples, ...
-       range_bins, thr.broadband * range_binsN, ...
-       thr.click_dB, NoiseSub);
-   
-    [filtered_spectrogram, mask] = CalculateFilter(snr_power_dB, 10, 0, 1, 0, 1, 1, 1);
-   
+    % Retrieve the data for this block
+    StopBlock_s = min(StartBlock_s + block_padded_s, Stop_s);
+    Signal = ioReadWav(handle, header, StartBlock_s, StopBlock_s, ...
+        'Units', 's', 'Channels', channel);
+    % Perform spectral analysis on block
+    [power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
+        Length_samples, Advance_samples, shift_samples, ...
+        range_bins, thr.broadband * range_binsN, ...
+        thr.click_dB, NoiseSub);
     
-    dims = size(filtered_spectrogram);
+    if (ridge_tracking_enabled)
+        
+        [filtered_spectrogram, mask] = CalculateFilter(...
+            power_dB, ...
+            ridge_tracking_hp_thresh, ...
+            ridge_tracking_lp_thresh, ...
+            ridge_tracking_isd, ...
+            ridge_tracking_adaptive_filter, ...
+            ridge_tracking_bandpass_filter, ...
+            ridge_tracking_click_filter, ...
+            ridge_tracking_use_mask);
+    
+        %filtered_spectrogram = snr_power_dB;
+    
+        dims = size(filtered_spectrogram);
 
-    % This is the width for the guassian derivative function.
-    % this is what the Ridge Track used.
-    guassian_width = 5;
+        % At the moment this is the struct that will store the angles
+        % and some processing flags.
+        functionals = struct;
+        functionals.angles = zeros(dims);
+        functionals.gvs = cell(dims);
+        functionals.evs = cell(dims);
+        functionals.processed = zeros(dims, 'uint8');
+        functionals.computed = zeros(dims, 'uint8');
 
-    % At the moment this is the struct that will store the angles
-    % and some processing flags.
-    functionals = struct;
-    functionals.angles = zeros(dims);
-    functionals.processed = zeros(dims, 'uint8');
-    functionals.computed = zeros(dims, 'uint8');
+        % At the moment this holds the derivative infomration.  This
+        % is processed for the whole spectrogram at onece.  We possibly
+        % could do this lazily also.
+        derivatives = struct;
+        derivatives.guassian_width = ridge_guassian_width;
+        derivatives.gx  = gfilter(filtered_spectrogram,ridge_guassian_width,[0 1]);
+        derivatives.gy  = gfilter(filtered_spectrogram,ridge_guassian_width,[1 0]);
+        derivatives.gxx = gfilter(filtered_spectrogram,ridge_guassian_width,[0 2]);
+        derivatives.gyy = gfilter(filtered_spectrogram,ridge_guassian_width,[2 0]);
+        derivatives.gxy = gfilter(filtered_spectrogram,ridge_guassian_width,[2 2]);
+        derivatives.gyx = derivatives.gxy;
 
-    % At the moment this holds the derivative infomration.  This
-    % is processed for the whole spectrogram at onece.  We possibly
-    % could do this lazily also.
-    derivatives = struct;
-    derivatives.gx=gfilter(filtered_spectrogram,guassian_width,[0 1]);
-    derivatives.gy=gfilter(filtered_spectrogram,guassian_width,[1 0]);
-    derivatives.gxx=gfilter(filtered_spectrogram,guassian_width,[0 2]);
-    derivatives.gyy=gfilter(filtered_spectrogram,guassian_width,[2 0]);
-    derivatives.gxy=gfilter(filtered_spectrogram,guassian_width,[2 2]);
-    derivatives.gyx=derivatives.gxy;
-   
-    if (exist('SPCallback', 'var'))
-        SPCallback.new_block(snr_power_dB,filtered_spectrogram);
+        forward_ridge_tracking = cell(1,size(snr_power_dB, 2));
     end
    
-   % relative to file rather than block
-   Indices.timeidx = Indices.timeidx + StartBlock_s;
+    % relative to file rather than blockclear
+    Indices.timeidx = Indices.timeidx + StartBlock_s;
    
-   active_set.debug = false;
-   forward_ridge_tracking = cell(1,size(snr_power_dB, 2));
+    if (exist('SPCallback', 'var'))
+        SPCallback.new_block(snr_power_dB, Indices.timeidx, filtered_spectrogram, derivatives);
+    end
    
-   for frame_idx = 1:size(snr_power_dB, 2)              
+    active_set.DEBUGGING = false;
+   
+   
+    for frame_idx = 1:size(snr_power_dB, 2)              
        
        % determine current time
        % could be computed only when we know that we have something
@@ -464,20 +501,20 @@ while StartBlock_s + 2 * Length_s < Stop_s
            
            
            peakN_last_processed = peakN;
-           
-           ridge_peaks = forward_ridge_tracking{frame_idx};
-           ridge_peaks_num = length(ridge_peaks);
-           ridge_peaks_to_omit = zeros(1,ridge_peaks_num);
+           if (ridge_tracking_enabled)
+           ridge_points = forward_ridge_tracking{frame_idx};
+           ridge_points_num = length(ridge_points);
+           ridge_points_close_to_peaks = zeros(1,ridge_points_num);
            ridge_supported_peaks = zeros(1,length(peak));
            
            for ind=1:size(peak,2)
                p = peak(ind);
                ridge_supported = 0;
                
-               for r_idx=1:length(ridge_peaks)
-                   if abs(round(ridge_peaks(r_idx)) - p) <= 2;
+               for r_idx=1:length(ridge_points)
+                   if abs(round(ridge_points(r_idx)) - p) <= ridge_closeness_thresh;
                        ridge_supported = 1;
-                       ridge_peaks_to_omit(r_idx) = 1;
+                       ridge_points_close_to_peaks(r_idx) = 1;
                        break;
                    end
                end
@@ -490,16 +527,44 @@ while StartBlock_s + 2 * Length_s < Stop_s
                    continue;                   
                end
                
+               
                % The peak is not part of a ridge, so go ahead and track a
                % new ridge from here.
-               [ridge,functionals] = TrackRidge(functionals, derivatives,frame_idx,p,1);
                
-               if (size(ridge,1) < 25)
-                   ridge = [];
+               [ridge, functionals] = TrackRidge(functionals, derivatives,frame_idx,p,ridge_forward_only);
+               
+               smoothed_ridge = SmoothCurves2({ridge},2,1000);
+               smoothed_ridge = smoothed_ridge{1};
+  
+               % optimize this so we aren't rounding twice.
+               smoothed_ridge = smoothed_ridge(find(round(smoothed_ridge(:,1)) <= size(dft,2)),:);
+               
+               % Minimum length 
+               if (size(smoothed_ridge,1) < ridge_min_length)
+                   smoothed_ridge = [];
                end
                
-               if (size(ridge,1) > 1)
+               if (size(smoothed_ridge,1) > 1)
                    ridge_supported_peaks(ind) = 1;
+                   ridge_points = [ridge_points p];
+                   
+                   % Calculate frequencies
+                   freqs = (smoothed_ridge(:,2) - 1)* bin_Hz + OffsetHz;                   
+                   
+                   % Calculate times
+                   current_time = Indices.timeidx(frame_idx);
+                   frame_offset = smoothed_ridge(:,1) - frame_idx;
+                   time_offset = frame_offset * Advance_s;
+                   times = current_time + time_offset;
+                   
+                   % need to round these to index into other matricies
+                   frame_indicies = round(smoothed_ridge(:,1));
+                   freqs_bins = round(smoothed_ridge(:,2));
+                   linear_idx = sub2ind(size(dft),freqs_bins,frame_indicies);
+                   angles = angle(dft(linear_idx));
+                   dBs = snr_power_dB(linear_idx);
+                   
+                   active_set.add_ridge(times, freqs, dBs, angles, thr.maxslope_Hz_per_ms, thr.activeset_s);
                end
                   
                for rIdx=2:size(ridge,1)
@@ -510,23 +575,58 @@ while StartBlock_s + 2 * Length_s < Stop_s
                    forward_ridge_tracking{cell_ind} = slice_vector;
                end
                if (exist('SPCallback', 'var'))
-                   SPCallback.handle_non_ridge_peak(frame_idx,p, ridge);
+                   SPCallback.handle_non_ridge_peak(frame_idx,p, smoothed_ridge);
                end
            end
            
-           %ridge_peaks_to_keep = round(ridge_peaks(find(ridge_peaks_to_omit==0)));
-           %peak = [peak ridge_peaks_to_keep];
-           %ridge_supported_peaks = [ridge_supported_peaks ones(1,length(ridge_peaks_to_keep))];
+           switch ridge_peak_mode
+               case 'peaks_only'
+                   % This uses ONLY the peaks, but indicates which are
+                   % supported by ridges.
+                   peaks = peak;
+                   ridge_supported_peaks_f = ridge_supported_peaks;
+               
+               case 'peak_priority'
+                   % This will take all of the peaks
+                   ridge_peaks_to_keep = round(ridge_points(find(ridge_points_close_to_peaks==0)));
+                   peaks = [peak ridge_peaks_to_keep];
+                   ridge_supported_peaks_f = [ridge_supported_peaks ones(1,length(ridge_peaks_to_keep))];
            
-           peak_freq = (peak - 1)* bin_Hz + OffsetHz;
+               case 'ridge_priority'
+                   % This will send in all the peaks from the ridges and detected
+                   % peaks that were not close ridges.
+                   non_ridge_peaks = peak(find(ridge_supported_peaks == 0));
+                   peaks = [non_ridge_peaks round(ridge_points)];
+                   ridge_supported_peaks_f = [zeros(1,length(non_ridge_peaks)) ones(1,length(ridge_points))];
+               
+               case 'non_ridge_only'
+                   % This will send in all the peaks from the ridges and detected
+                   % peaks that were not close ridges.
+                   non_ridge_peaks = peak(find(ridge_supported_peaks == 0));
+                   peaks = non_ridge_peaks;
+                   ridge_supported_peaks_f = zeros(1,length(peaks));         
+           end
+           
+           if (length(peaks) < 1)
+               continue;
+           end
+           else
+               peaks = peak;
+               ridge_supported_peaks_f = zeros(1,length(peaks));
+               
+           end
+    
+           % Convert the peak location to frequencies.
+           peak_freq = (peaks - 1)* bin_Hz + OffsetHz;
            
            % examine active list and see if anything needs to be removed
            % or moved to the list of whistles
            active_set.prune(current_s, thr.minlen_s, thr.maxgap_s);
-
+           
            % Create TreeSet of time-frequency nodes for peaks
-           peak_list = tfTreeSet(current_s(ones(size(peak))), ...
-               peak_freq, smoothed_dB(peak), angle(dft(peak, frame_idx)), ridge_supported_peaks);
+           peak_list = tfTreeSet(current_s(ones(size(peaks))), ...
+               ... %peak_freq, smoothed_dB(peaks), angle(dft(peaks, frame_idx)), ridge_supported_peaks_f);
+                peak_freq, smoothed_dB(peaks), zeros(size(peaks)), ridge_supported_peaks_f);
                     
            % Link anything possible from the current active set to the
            % new peaks then add them to the active set.            
@@ -534,27 +634,24 @@ while StartBlock_s + 2 * Length_s < Stop_s
  
        end
 
-   end % end for frame_idx
-   
-   StartBlock_s = Indices.timeidx(end) + Advance_s - shift_samples_s;  % Set time for next block
+    end % end for frame_idx
+    StartBlock_s = Indices.timeidx(end) + Advance_s - shift_samples_s;  % Set time for next block
    
 end  % for block_idx
 
 if ~ isempty(MovieH)
     MovieH = close(MovieH);
 end
+
 % Clean up, process any remaining partial tonals by faking a time in the 
 % future.
-active_set.prune(current_s + 2*thr.maxgap_s, ...
-    thr.minlen_s, thr.maxgap_s);
+active_set.prune(current_s + 2*thr.maxgap_s,thr.minlen_s, thr.maxgap_s);
 
 if graph_ret
-    subgraphs = active_set.subgraphs;    
+    subgraphs = active_set.getResultGraphs();    
 end
+
 if ~ isempty(graph_h)
-    % To Do: write out the graphs 
-    
-    % graph_h.write(active_set.subgraphs);
     graph_h.close();
 end
 
@@ -563,37 +660,37 @@ stopwatch = tic;
 
 tonals = java.util.LinkedList(); % Detected tonals
 discarded_count = 0;
-it = active_set.subgraphs.iterator();
+it = active_set.getResultGraphs().iterator();
 while it.hasNext()
-            toneset = it.next();
-                                        
-            % NOTE: Last 2 flag argument for disambiguate java
-            %       method can't both be true (Experimental stage)
-            % false, true - polynomial fit of first difference of
-            %               phase to frequency
-            % true, false - vector strength
-            % false, false - polynomial fit of frequency to time
-            g = toneset.disambiguate(thr.disambiguate_s, resolutionHz,...
-                false, false);
-            % Obtain the edges
-            edges = g.topological_sort();
-            % Loop through each edge
-            segIt = edges.iterator();
-            while segIt.hasNext()
-                edge = segIt.next();
-                tone = edge.content;
-                if tone.get_duration() > thr.minlen_s
-                    if tonal_ret
-                        tonals.addLast(tone);
-                    end
-                    if ~ isempty(tonal_h)
-                        % write out the tonal
-                        tonal_h.write(tone);
-                    end
-                else
-                    discarded_count = discarded_count + 1;
-                end
+    subgraph = it.next();
+
+    % NOTE: Last 2 flag argument for disambiguate java
+    %       method can't both be true (Experimental stage)
+    % false, true - polynomial fit of first difference of
+    %               phase to frequency
+    % true, false - vector strength
+    % false, false - polynomial fit of frequency to time
+    g = subgraph.disambiguate(thr.disambiguate_s, resolutionHz,...
+        ridge_tracking_enabled, ridge_percentage);
+    % Obtain the edges
+    edges = g.topological_sort();
+    % Loop through each edge
+    segIt = edges.iterator();
+    while segIt.hasNext()
+        edge = segIt.next();
+        tone = edge.content;
+        if tone.get_duration() > thr.minlen_s
+            if tonal_ret
+                tonals.addLast(tone);
             end
+            if ~ isempty(tonal_h)
+                % write out the tonal
+                tonal_h.write(tone);
+            end
+        else
+            discarded_count = discarded_count + 1;
+        end
+    end
 end
 if ~ isempty(tonal_h)
     tonal_h.close();
