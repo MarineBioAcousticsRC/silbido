@@ -194,7 +194,6 @@ Stop_s = min(Stop_s + block_pad_s, ...
 
 blkstart_s = Start_s;
 
-
 done = false;
 hidx = 1;
 
@@ -202,8 +201,10 @@ if isempty(AxisH)
     AxisH = gca;
 end
 
+axes(AxisH);
+
 while ~ done
-    
+    fprintf('processing %f to %f\n', blkstart_s, blkstart_s + block_len_s );
     % Read in the block and compute spectra
     [Signal, snr_dB, Indices, dft, clickP] = ...
         dtProcessBlock(handle, header, channel, ...
@@ -260,8 +261,8 @@ set(AxisH, 'XLim', [Start_s, Stop_s]);
 set(AxisH, 'YDir', 'normal');
 set(AxisH, 'YLim', [fkHz(1), fkHz(end)]);
 set(AxisH, 'fontsize', 12, 'fontweight', 'b');
-xlabel('time (s)', 'fontsize', 12, 'fontweight', 'b');
-ylabel('freq (kHz)', 'fontsize', 12, 'fontweight', 'b');
+xlabel(AxisH, 'time (s)', 'fontsize', 12, 'fontweight', 'b');
+ylabel(AxisH, 'freq (kHz)', 'fontsize', 12, 'fontweight', 'b');
 
 ColorbarH = colorbar('peer', AxisH);
 set(get(ColorbarH, 'YLabel'), ...

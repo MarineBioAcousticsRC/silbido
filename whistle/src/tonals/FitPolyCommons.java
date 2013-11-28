@@ -20,8 +20,8 @@ public class FitPolyCommons extends FitPolyBase {
     	super(degree, x, y);
     }
     
-    public FitPolyCommons(int degree, tonal path, int skip_n, boolean fit_dphase, boolean incoming_edge) {
-    	super(degree, path, skip_n, fit_dphase, incoming_edge);
+    public FitPolyCommons(int degree, tonal path, int skip_n, boolean incoming_edge) {
+    	super(degree, path, skip_n, incoming_edge);
 	}
     
     protected void createFit(double[] x, double[] y) {

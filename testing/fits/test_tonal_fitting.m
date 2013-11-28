@@ -4,12 +4,12 @@ import tonals.*;
 
 load('fits/test-tonals.mat');
 
-tonal = tonals{1};
+tonal = tonals{2};
 
 times = tonal.times;
 freqs = tonal.freqs;
 
-figure(1);
+figure();
 plot(times,freqs, 'LineWidth', 3);
 hold on;
 
@@ -18,6 +18,9 @@ how_far_back_s = 0.025;
 max_gap_start_hz = 1000;
 max_gap_hz = 200;
 max_gap_s = 50 / 1000;
+degree = 5;
+fit_thresh = 0.7;
+resolutionHz = 125;
 
 % Seed the fit with the initial point in the tonal.
 t_fit = times(1);
@@ -60,12 +63,10 @@ for idx=1:length(times) - 1
     f_fit_tail = f_fit(tail_idx:end);
     
     % Compute the fit.
-    degree = 5;
-    fit_thresh = 0.7;
-    resolutionHz = 125;
+    
     fit = FitPolyJama(degree, t_fit_tail, f_fit_tail);
     
-    fprintf('Fit Adjusted R2: %f\n', fit.getAdjustedR2());
+    %fprintf('Fit Adjusted R2: %f\n', fit.getAdjustedR2());
     
     while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && length(t_fit_tail) > degree *3)
         degree = degree + 1;
@@ -77,10 +78,14 @@ for idx=1:length(times) - 1
     end
     pr_freq = fit.predict(next_time);
     
+    scatter(next_time, pr_freq, 'cx');
+    
     % Get the ground truth value that will simulate a peak.
     gt_freq = freqs(idx + 1);
     
     freq_error = abs(pr_freq - gt_freq);
+    
+    fprintf('fit error: %f\n', freq_error');
     
     if (length(t_fit) < 3 && freq_error < max_gap_start_hz || ...
         freq_error < max_gap_hz)

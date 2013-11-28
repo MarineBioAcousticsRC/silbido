@@ -9,7 +9,11 @@ public class ActiveSet {
 	/**
 	 * Determines if debugging output and data collection is performed. 
 	 */
-	public static boolean DEBUGGING = false;
+	private static boolean DEBUGGING = false;
+	
+	public static void setDebugging(boolean deubgging) {
+		DEBUGGING = deubgging;
+	}
 	
 	/** 
 	 * The set of nodes that belong to graphs that are of sufficient
@@ -75,6 +79,14 @@ public class ActiveSet {
 		activeSet = new tfTreeSet();
 		ridgeFrontier = new tfTreeSet();
 		this.partialGraphs = new HashMap<tfnode, PartialGraph>();
+	}
+	
+	public tfTreeSet getActiveSet() {
+		return this.activeSet;
+	}
+	
+	public tfTreeSet getOrphanSet() {
+		return this.orphans;
 	}
 	
 	public void setResolutionHz(double resolutionHz) {
@@ -565,32 +577,28 @@ public class ActiveSet {
 			f.add(n.freq);
 			depth = depth + 1;
 			if (start - n.time >= back_s || ! n.chained_backward()) {
+//				int order = t.size() > 6?2:1;
 				int order = 1;
 				// far enough back, fit the polynomial
-				FitPoly fit = new FitPolyOrig(order, t, f);
-				//FitPoly fit = new FitPolyJama(order, t, f);
+				FitPoly fit = new FitPolyJama(order, t, f);
+
 				if (DEBUGGING) {
 					System.out.printf("%d order fit t=%s; f=%s;\n", order, t.toString(), f.toString());
 					System.out.printf("p=%s;\n", fit.toString());
 				}
-				order = order + 1;
 				// If the bit is bad, try the next order up.  
 				// When the frequencies have a standard deviation
 				// that is somewhere near our quantization noise or
 				// if there are not enough points to get a good
 				// higher order fit, we live with the fit we have.
-				while (fit.getR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && t.size() > order*3) {
-//				while (fit.getAdjustedR2() < fit_thresh && t.size() > order*3) {
-					// lousy fit, try again
-//					order = order + 1;
-					FitPoly newFit = new FitPolyOrig(order, t, f);
-//					FitPoly newFit = new FitPolyJama(order, t, f);
+				while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && t.size() > order*3) {
+					order++;
+					FitPoly newFit = new FitPolyJama(order, t, f);
 					if(newFit.getAdjustedR2() > fit.getAdjustedR2()){
 						fit = newFit;
 					}
 					if (DEBUGGING)
 						System.out.printf("Refit p=%s\n", fit.toString());
-					order = order + 1;
 				}
 				list.add(fit);
 				

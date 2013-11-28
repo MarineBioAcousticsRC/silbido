@@ -27,8 +27,8 @@ public class FitPolyJama extends FitPolyBase {
     	super(degree, x, y);
     }
     
-    public FitPolyJama(int degree, tonal path, int skip_n, boolean fit_dphase, boolean incoming_edge) {
-    	super(degree, path, skip_n, fit_dphase, incoming_edge);
+    public FitPolyJama(int degree, tonal path, int skip_n, boolean incoming_edge) {
+    	super(degree, path, skip_n, incoming_edge);
 	}
 
 	protected void createFit(double[] x, double[] y) {

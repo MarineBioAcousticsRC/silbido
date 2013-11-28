@@ -89,7 +89,7 @@ public abstract class FitPolyBase implements FitPoly {
 		evalauteFit(x,y);
     }
     
-    public FitPolyBase(int degree, tonal path, int skip_n, boolean fit_dphase, boolean incoming_edge) {
+    public FitPolyBase(int degree, tonal path, int skip_n, boolean incoming_edge) {
     	this.degree = degree;
     	int n = path.size();
 
@@ -111,52 +111,14 @@ public abstract class FitPolyBase implements FitPoly {
 		double start_s = node.time; 
 
 		int i = 0;
-		if (fit_dphase) {
-			double diff = 0.0;
-			
-			if (n > skip_n + 1) {
-				while (skip_n != 0 & elapsed_s < how_far_s) {
-					// skip N nodes
-					node = it.next();
-					elapsed_s = Math.abs(start_s - node.time);
-					skip_n--;
-				}
-			}
-
-			while (it.hasNext() & elapsed_s < how_far_s) {
-				prev = node;
-				node =  it.next();
-				elapsed_s = Math.abs(start_s - node.time);
-				
-				if (incoming_edge) {
-					x_tmp[i] = prev.freq;
-				} else {
-					x_tmp[i] = node.freq;
-				}
-
-				// first phase difference
-				if (Math.signum(node.phase) == Math.signum(prev.phase)) {
-					diff = Math.abs(node.phase - prev.phase);
-				} else {
-					if (node.phase < 0.0) {
-						diff = Math.abs(node.phase) + prev.phase;
-					} else {
-						diff = Math.abs(prev.phase) + node.phase;
-					}
-				}
-				y_tmp[i] = diff;
-				i++;
-			}
-		}
-		else {
-			// polynomial fit of frequency to time. (slope and shape)
-			while (it.hasNext() & elapsed_s < how_far_s) {
-				x_tmp[i] = node.time;
-				y_tmp[i] = node.freq;
-				i++;
-				node = it.next();
-				elapsed_s = Math.abs(start_s - node.time);
-			}
+		
+		// polynomial fit of frequency to time. (slope and shape)
+		while (it.hasNext() & elapsed_s < how_far_s) {
+			x_tmp[i] = node.time;
+			y_tmp[i] = node.freq;
+			i++;
+			node = it.next();
+			elapsed_s = Math.abs(start_s - node.time);
 		}
 		
 		numObservations = Math.min(i, n);

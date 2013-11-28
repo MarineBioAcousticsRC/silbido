@@ -76,11 +76,10 @@ function [PeakList, PeakIndicator] = spPeakSelector(Signal, varargin)
 Method = 'regression';
 Order = 1;     % how far out to compute regression
 PeakType = 'peak';
-FindPeaks = 1;	% Controls for finding peaks & valleys
-FindValleys = 0;
 Display = 0;	% plot?
 Epsilon = 0;
 Jerk = 0;
+
 n=1;
 while n < length(varargin)
   switch varargin{n}
@@ -90,7 +89,7 @@ while n < length(varargin)
 
    case 'JerkRange' 
     JerkRange = varargin{n+1}; n=n+2;
-    if ~ isnumeric(JerkRange) || length(JerkRange ~= 2)
+    if ~isnumeric(JerkRange) || length(JerkRange) ~= 2
       error('JerkRange argument must be a 2 dimensional numeric vector');
     end
     if JerkRange(1) > JerkRange(2)
@@ -118,19 +117,19 @@ while n < length(varargin)
     n=n+2;
     
    otherwise
-    error(sprintf('Bad optional argument: "%s"', varargin{n}));
+    error('Bad optional argument: "%s"', varargin{n});
 
   end
 end
 
 % Ensure that Signal is of the proper type
-if ~ utIsVector(Signal)
-  error('Signal must be a vector.')
-end
+%if ~ utIsVector(Signal)
+%  error('Signal must be a vector.')
+%end
 
-if ~ utIsVector(Signal, 'Type', 'column')
-  Signal = Signal';
-end
+%if ~ utIsVector(Signal, 'Type', 'column')
+%  Signal = Signal';
+%end
 
 switch PeakType
  case 'peak'
@@ -152,10 +151,10 @@ Valleys = [];
 switch Method
  case 'magnitude'
   if FindPeaks
-    [DontCare, Peaks] = max(Signal);
+    [~, Peaks] = max(Signal);
   end
   if FindValleys
-    [DontCare, Valleys] = min(Signal);
+    [~, Valleys] = min(Signal);
   end
   
  case 'simple'
@@ -195,9 +194,10 @@ switch Method
   % Compute first (Signal(:,2)) & second (Signal(:,3)) derivatives  
   Signal = spDelta(Signal, Order, 'Method', 'regression');
   Signal = spDelta(Signal, 1, 'Components', 2);
+  
   if Jerk
     % Compute third derivative Signal(:, 4)
-  Signal = spDelta(Signal, 1, 'Components', 3);
+    Signal = spDelta(Signal, 1, 'Components', 3);
   end
   
   % Locate zero crossings:
@@ -205,9 +205,6 @@ switch Method
   %	Use first diff of Sign to locate change points
   
   ZeroCrossings = spZeroCrossings(Signal(:,2), Signal(:,3));
-  
-  % Check for zero crossing for peaks/valleys 
-  PeakList = [];
   
   if FindPeaks
     Peaks = ZeroCrossings(find(Signal(ZeroCrossings,3) < -Epsilon))';
@@ -218,7 +215,7 @@ switch Method
   end
   
  otherwise
-  error(sprintf('Bad method:  %s', Method))
+  error('Bad method:  %s', Method);
 end
 
 if Display 
@@ -236,12 +233,12 @@ if Display
   
   if FindPeaks
     plot(Peaks, Signal(Peaks, 1), 'r^');
-    LegendText = {LegendText{:}, 'peak'};
+    LegendText = {LegendText, {'peak'}};
   end
 
   if FindValleys
     plot(Valleys, Signal(Valleys, 1), 'gv');
-    LegendText = {LegendText{:}, 'valley'};
+    LegendText = {LegendText, {'valley'}};
   end
   
   legend(LegendText{:})
@@ -252,7 +249,7 @@ end
 
 % set up output arguments
 PeakList = [Peaks; Valleys];
-if ~ isempty(Peaks) & ~ isempty(Valleys)
+if ~ isempty(Peaks) && ~ isempty(Valleys)
   % Has both peaks & valleys, sort them and retain
   % permutation in case user wants peak/valley indicator
   [PeakList, Permute] = sort(PeakList);

@@ -65,7 +65,6 @@ tic;
 SNR_dB = -inf;  % threshold
 RatioAbove_SNR = .333;
 NoiseSub = {'median'}; 
-%NoiseSub = {'median', [3 3], 3};  % with 3 s MA
 
 %warning off;
 import tonals.*;

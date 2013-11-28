@@ -56,6 +56,7 @@ import java.util.TreeSet;
 import tonals.*;
 
 % stuff for debugging
+debug = false;
 colors = lines(20);
 colorN = size(colors, 1);
 coloridx = 1;
@@ -64,7 +65,8 @@ handles = [];
 subgraphs_closed = 0;
 Plot = 0;
 Interactive = false;
-Debug = false;
+ActiveSet.setDebugging(debug);
+
 
 
 % Ridge Tracker Settings
@@ -150,6 +152,8 @@ TonalFile = [];      % Save detected tonals to file
 RemoveTransients = false;  % mitigate for clicks/snapping shrimp
 WaitTimeRejection = [];
 
+callbackSet = false;
+
 k = 1;
 while k <= length(varargin)
     switch varargin{k}
@@ -200,6 +204,7 @@ while k <= length(varargin)
             GraphFile = varargin{k+1}; k=k+2;
        case 'SPCallback'
             SPCallback = varargin{k+1}; k=k+2;
+            callbackSet = true;
         case 'WaitTimeRejection'
             if length(varargin{k+1}) ~= 3
                 error('%s expecting [N_events, wait_s, maxdur_s]', ...
@@ -286,11 +291,14 @@ if (Start_s >= Stop_s)
 end
 
 MovieH = [];  % open movie file
-if Plot
-    [notused ImageH]= dtPlotSpecgram(Filenames{file_idx}, Start_s, Stop_s, ...
-        'Framing', [thr.advance_ms, thr.length_ms], 'Render', 'floor', ...
+if Plot && 0
+    
+    [~, ImageH]= dtPlotSpecgram(Filenames{file_idx}, Start_s, Stop_s, ...
+        'Framing', [thr.advance_ms, thr.length_ms], ...
+        'Contrast_Pct', 200, 'Brightness_dB', 10, ...
         'Range', [thr.low_cutoff_Hz thr.high_cutoff_Hz], ...
-        'Threshold', thr.whistle_dB, 'Click_dB', thr.click_dB, ...
+        'Threshold', thr.whistle_dB, ...
+        'Click_dB', thr.click_dB, ...
         'Noise', NoiseSub);
     
     % Load the icon stored in icon.mat
@@ -360,8 +368,6 @@ freq = (range_bins - 1)/Length_samples * header.fs;
 shift_samples = floor(header.fs / thr.high_cutoff_Hz);
 shift_samples_s = shift_samples / header.fs; 
 
-TwoPi = 2*pi;  % constant we use in phase estimation
-
 block_pad_s = 1 / thr.high_cutoff_Hz;
 block_padded_s = block_len_s + 2 * block_pad_s;
 Stop_s = Stop_s - block_pad_s;
@@ -370,9 +376,6 @@ if Start_s - block_pad_s >= 0
     Start_s = Start_s - block_pad_s;
 end
 
-% Flags required for computing MA(moving average) implementation.
-start_sect = false;  % Start section
-stop_sect = false;  % End section
 
 % Keep track of how many peaks were detected in the previous frame
 % that was processed.  If the number of peaks suddenly rise by
@@ -382,6 +385,13 @@ stop_sect = false;  % End section
 peakN_last_processed = range_binsN * 0.25;  
 
 StartBlock_s = Start_s;
+if (Plot > 0)
+    figure();
+    hold on;
+    colormap(bone());
+    AxisH = gca;
+end
+    
 % Seem to be having problem getting to stop time due to
 % incomplete frames.  For now kludge in a little padding
 % to stop just before stop time.  Bhavesh, please fix.
@@ -394,11 +404,30 @@ while StartBlock_s + 2 * Length_s < Stop_s
     StopBlock_s = min(StartBlock_s + block_padded_s, Stop_s);
     Signal = ioReadWav(handle, header, StartBlock_s, StopBlock_s, ...
         'Units', 's', 'Channels', channel);
+    
     % Perform spectral analysis on block
     [power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
         Length_samples, Advance_samples, shift_samples, ...
         range_bins, thr.broadband * range_binsN, ...
         thr.click_dB, NoiseSub);
+    
+    if (callbackSet)
+        SPCallback.block_started(snr_power_dB, StartBlock_s, StopBlock_s);
+    end
+    
+    if (Plot > 0)
+        fHz = thr.low_cutoff_Hz:bin_Hz:thr.high_cutoff_Hz;
+        fkHz = fHz / 1000;
+        time_idx = Indices.timeidx + StartBlock_s;
+        rendered = snr_power_dB;
+
+        imageH = image(time_idx, fkHz, snr_power_dB, 'Parent', AxisH);  
+        colorData = (200/100) .* rendered + 10;
+        set(imageH, 'CData', colorData);
+
+        frameStart = max(min(time_idx)  -block_padded_s * .2, 0);
+        set(AxisH, 'XLim', [frameStart, max(time_idx)]);
+    end
     
     if (ridge_tracking_enabled)
         
@@ -443,12 +472,9 @@ while StartBlock_s + 2 * Length_s < Stop_s
     % relative to file rather than blockclear
     Indices.timeidx = Indices.timeidx + StartBlock_s;
    
-    if (exist('SPCallback', 'var'))
-        SPCallback.new_block(snr_power_dB, Indices.timeidx, filtered_spectrogram, derivatives);
+    if (callbackSet)
+        %SPCallback.new_block(snr_power_dB, Indices.timeidx, filtered_spectrogram, derivatives);
     end
-   
-    active_set.DEBUGGING = false;
-   
    
     for frame_idx = 1:size(snr_power_dB, 2)              
        
@@ -467,22 +493,22 @@ while StartBlock_s + 2 * Length_s < Stop_s
 
        % Remove peaks that don't meet SNR criterion
        peak(smoothed_dB(peak) < thr.whistle_dB) = [];  
-       % some of the peaks may be too close and are probably local maxima
-       % of the same peak
-       if length(peak) > 1 && false
-           peak_dist = diff(peak);
-           % temporary hard code, should drive by Hz
-           too_close = find(peak_dist < 2);
-           if ~ isempty(too_close)
-               % find the larger peak and remove the other one
-               [maxval maxidx] = ...
-                   max(smoothed_dB(peak([too_close; too_close+1])));
-               % remove lower peaks
-               peak(too_close + maxidx - 1) = [];
-           end
+       
+       peak = consolidate_peaks(peak, smoothed_dB, 2);
+       
+       if (callbackSet)
+           SPCallback.frame_started(current_s);
        end
        
-
+       if (Plot > 0)
+           if (exist('status_marker', 'var'))
+               delete(status_marker);
+           end
+           status_marker = plot([current_s current_s], ...
+               [0, thr.high_cutoff_Hz]/1000, 'g.');
+           
+       end
+       
        peakN = length(peak);
        if ~ isempty(peak)
            % found something
@@ -492,6 +518,9 @@ while StartBlock_s + 2 * Length_s < Stop_s
            % signal (click) and skip this frame.
            increase = (peakN - peakN_last_processed) / range_binsN;
            if increase > thr.broadband
+               if (callbackSet)
+                   SPCallback.handle_broadband_frame(current_s);
+               end
                if (Plot > 0)
                    plot([current_s current_s], ...
                        [thr.high_cutoff_Hz*.95, thr.high_cutoff_Hz]/1000, 'm-');
@@ -499,121 +528,118 @@ while StartBlock_s + 2 * Length_s < Stop_s
                continue
            end
            
-           
            peakN_last_processed = peakN;
            if (ridge_tracking_enabled)
-           ridge_points = forward_ridge_tracking{frame_idx};
-           ridge_points_num = length(ridge_points);
-           ridge_points_close_to_peaks = zeros(1,ridge_points_num);
-           ridge_supported_peaks = zeros(1,length(peak));
-           
-           for ind=1:size(peak,2)
-               p = peak(ind);
-               ridge_supported = 0;
-               
-               for r_idx=1:length(ridge_points)
-                   if abs(round(ridge_points(r_idx)) - p) <= ridge_closeness_thresh;
-                       ridge_supported = 1;
-                       ridge_points_close_to_peaks(r_idx) = 1;
-                       break;
+               ridge_points = forward_ridge_tracking{frame_idx};
+               ridge_points_num = length(ridge_points);
+               ridge_points_close_to_peaks = zeros(1,ridge_points_num);
+               ridge_supported_peaks = zeros(1,length(peak));
+
+               for ind=1:size(peak,2)
+                   p = peak(ind);
+                   ridge_supported = 0;
+
+                   for r_idx=1:length(ridge_points)
+                       if abs(round(ridge_points(r_idx)) - p) <= ridge_closeness_thresh;
+                           ridge_supported = 1;
+                           ridge_points_close_to_peaks(r_idx) = 1;
+                           break;
+                       end
+                   end
+
+                   if ridge_supported == 1
+                       ridge_supported_peaks(ind) = 1;
+                       if (callbackSet)
+                           SPCallback.handle_ridge_peak(frame_idx,p);
+                       end
+                       continue;                   
+                   end
+
+                   % The peak is not part of a ridge, so go ahead and track a
+                   % new ridge from here.
+
+                   [ridge, functionals] = TrackRidge(functionals, derivatives,frame_idx,p,ridge_forward_only);
+
+                   smoothed_ridge = SmoothCurves2({ridge},2,1000);
+                   smoothed_ridge = smoothed_ridge{1};
+
+                   % optimize this so we aren't rounding twice.
+                   smoothed_ridge = smoothed_ridge(find(round(smoothed_ridge(:,1)) <= size(dft,2)),:);
+
+                   % Minimum length 
+                   if (size(smoothed_ridge,1) < ridge_min_length)
+                       smoothed_ridge = [];
+                   end
+
+                   if (size(smoothed_ridge,1) > 1)
+                       ridge_supported_peaks(ind) = 1;
+                       ridge_points = [ridge_points p];
+
+                       % Calculate frequencies
+                       freqs = (smoothed_ridge(:,2) - 1)* bin_Hz + OffsetHz;                   
+
+                       % Calculate times
+                       current_time = Indices.timeidx(frame_idx);
+                       frame_offset = smoothed_ridge(:,1) - frame_idx;
+                       time_offset = frame_offset * Advance_s;
+                       times = current_time + time_offset;
+
+                       % need to round these to index into other matricies
+                       frame_indicies = round(smoothed_ridge(:,1));
+                       freqs_bins = round(smoothed_ridge(:,2));
+                       linear_idx = sub2ind(size(dft),freqs_bins,frame_indicies);
+                       angles = angle(dft(linear_idx));
+                       dBs = snr_power_dB(linear_idx);
+
+                       active_set.add_ridge(times, freqs, dBs, angles, thr.maxslope_Hz_per_ms, thr.activeset_s);
+                   end
+
+                   for rIdx=2:size(ridge,1)
+                       ridge_value = ridge(rIdx,:);
+                       cell_ind = round(ridge_value(1));
+                       slice_vector = forward_ridge_tracking{cell_ind};
+                       slice_vector = [slice_vector ridge_value(2)];
+                       forward_ridge_tracking{cell_ind} = slice_vector;
+                   end
+                   if (callbackSet)
+                       SPCallback.handle_non_ridge_peak(frame_idx,p, smoothed_ridge);
                    end
                end
-               
-               if ridge_supported == 1
-                   ridge_supported_peaks(ind) = 1;
-                   if (exist('SPCallback', 'var'))
-                       SPCallback.handle_ridge_peak(frame_idx,p);
-                   end
-                   continue;                   
+
+               switch ridge_peak_mode
+                   case 'peaks_only'
+                       % This uses ONLY the peaks, but indicates which are
+                       % supported by ridges.
+                       peaks = peak;
+                       ridge_supported_peaks_f = ridge_supported_peaks;
+
+                   case 'peak_priority'
+                       % This will take all of the peaks
+                       ridge_peaks_to_keep = round(ridge_points(find(ridge_points_close_to_peaks==0)));
+                       peaks = [peak ridge_peaks_to_keep];
+                       ridge_supported_peaks_f = [ridge_supported_peaks ones(1,length(ridge_peaks_to_keep))];
+
+                   case 'ridge_priority'
+                       % This will send in all the peaks from the ridges and detected
+                       % peaks that were not close ridges.
+                       non_ridge_peaks = peak(find(ridge_supported_peaks == 0));
+                       peaks = [non_ridge_peaks round(ridge_points)];
+                       ridge_supported_peaks_f = [zeros(1,length(non_ridge_peaks)) ones(1,length(ridge_points))];
+
+                   case 'non_ridge_only'
+                       % This will send in all the peaks from the ridges and detected
+                       % peaks that were not close ridges.
+                       non_ridge_peaks = peak(find(ridge_supported_peaks == 0));
+                       peaks = non_ridge_peaks;
+                       ridge_supported_peaks_f = zeros(1,length(peaks));         
                end
-               
-               
-               % The peak is not part of a ridge, so go ahead and track a
-               % new ridge from here.
-               
-               [ridge, functionals] = TrackRidge(functionals, derivatives,frame_idx,p,ridge_forward_only);
-               
-               smoothed_ridge = SmoothCurves2({ridge},2,1000);
-               smoothed_ridge = smoothed_ridge{1};
-  
-               % optimize this so we aren't rounding twice.
-               smoothed_ridge = smoothed_ridge(find(round(smoothed_ridge(:,1)) <= size(dft,2)),:);
-               
-               % Minimum length 
-               if (size(smoothed_ridge,1) < ridge_min_length)
-                   smoothed_ridge = [];
+
+               if (length(peaks) < 1)
+                   continue;
                end
-               
-               if (size(smoothed_ridge,1) > 1)
-                   ridge_supported_peaks(ind) = 1;
-                   ridge_points = [ridge_points p];
-                   
-                   % Calculate frequencies
-                   freqs = (smoothed_ridge(:,2) - 1)* bin_Hz + OffsetHz;                   
-                   
-                   % Calculate times
-                   current_time = Indices.timeidx(frame_idx);
-                   frame_offset = smoothed_ridge(:,1) - frame_idx;
-                   time_offset = frame_offset * Advance_s;
-                   times = current_time + time_offset;
-                   
-                   % need to round these to index into other matricies
-                   frame_indicies = round(smoothed_ridge(:,1));
-                   freqs_bins = round(smoothed_ridge(:,2));
-                   linear_idx = sub2ind(size(dft),freqs_bins,frame_indicies);
-                   angles = angle(dft(linear_idx));
-                   dBs = snr_power_dB(linear_idx);
-                   
-                   active_set.add_ridge(times, freqs, dBs, angles, thr.maxslope_Hz_per_ms, thr.activeset_s);
-               end
-                  
-               for rIdx=2:size(ridge,1)
-                   ridge_value = ridge(rIdx,:);
-                   cell_ind = round(ridge_value(1));
-                   slice_vector = forward_ridge_tracking{cell_ind};
-                   slice_vector = [slice_vector ridge_value(2)];
-                   forward_ridge_tracking{cell_ind} = slice_vector;
-               end
-               if (exist('SPCallback', 'var'))
-                   SPCallback.handle_non_ridge_peak(frame_idx,p, smoothed_ridge);
-               end
-           end
-           
-           switch ridge_peak_mode
-               case 'peaks_only'
-                   % This uses ONLY the peaks, but indicates which are
-                   % supported by ridges.
-                   peaks = peak;
-                   ridge_supported_peaks_f = ridge_supported_peaks;
-               
-               case 'peak_priority'
-                   % This will take all of the peaks
-                   ridge_peaks_to_keep = round(ridge_points(find(ridge_points_close_to_peaks==0)));
-                   peaks = [peak ridge_peaks_to_keep];
-                   ridge_supported_peaks_f = [ridge_supported_peaks ones(1,length(ridge_peaks_to_keep))];
-           
-               case 'ridge_priority'
-                   % This will send in all the peaks from the ridges and detected
-                   % peaks that were not close ridges.
-                   non_ridge_peaks = peak(find(ridge_supported_peaks == 0));
-                   peaks = [non_ridge_peaks round(ridge_points)];
-                   ridge_supported_peaks_f = [zeros(1,length(non_ridge_peaks)) ones(1,length(ridge_points))];
-               
-               case 'non_ridge_only'
-                   % This will send in all the peaks from the ridges and detected
-                   % peaks that were not close ridges.
-                   non_ridge_peaks = peak(find(ridge_supported_peaks == 0));
-                   peaks = non_ridge_peaks;
-                   ridge_supported_peaks_f = zeros(1,length(peaks));         
-           end
-           
-           if (length(peaks) < 1)
-               continue;
-           end
            else
                peaks = peak;
                ridge_supported_peaks_f = zeros(1,length(peaks));
-               
            end
     
            % Convert the peak location to frequencies.
@@ -625,18 +651,97 @@ while StartBlock_s + 2 * Length_s < Stop_s
            
            % Create TreeSet of time-frequency nodes for peaks
            peak_list = tfTreeSet(current_s(ones(size(peaks))), ...
-               ... %peak_freq, smoothed_dB(peaks), angle(dft(peaks, frame_idx)), ridge_supported_peaks_f);
-                peak_freq, smoothed_dB(peaks), zeros(size(peaks)), ridge_supported_peaks_f);
-                    
+               peak_freq, smoothed_dB(peaks), zeros(size(peaks)), ridge_supported_peaks_f);
+           
+           if (callbackSet)
+               SPCallback.handle_frame_peaks(active_set, peak_list);
+           end
+           
+           % something new to process - display if needed
+           if Plot > 0
+               if ~ isempty(handles)
+                   delete(handles{:});     % remove plots from last iteration
+                   clear handles;
+               end
+               
+               % Plot the peaks that were just detected.
+               handles{1} = plot(...
+                   peak_list.get_time(),...
+                   peak_list.get_freq/1000, ...
+                   'r^');
+               
+               % Plot the peaks that are currently in the active set.
+               handles{2} = plot(...
+                   active_set.getActiveSet().get_time(), ...
+                   active_set.getActiveSet().get_freq/1000, ...
+                   'y*');
+                   
+               if Plot > 2
+                   % Plot the orphans
+                   handles{3} = plot(...
+                       active_set.getOrphanSet().get_time(), ...
+                       active_set.getOrphanSet().get_freq/1000, ...
+                       'ko');
+               end
+           end
+           
            % Link anything possible from the current active set to the
            % new peaks then add them to the active set.            
            active_set.extend(peak_list, thr.maxslope_Hz_per_ms, thr.activeset_s);
- 
-       end
+           
+           if (callbackSet)
+               SPCallback.handle_active_set_extension(active_set);
+           end
+           
+           if Plot > 1
+               % plot subgraphs associated with the active and orphan sets
+               seen = [];
+               [handles, coloridx] = plot_graph(...
+                   active_set.getActiveSet(), ...
+                   handles, cmap, coloridx, '--');
+               
+               if Plot > 2
+                   [handles, coloridx] = plot_graph(...
+                       active_set.getOrphanSet(), ...
+                       handles, cmap, coloridx, '--', 'o');
+               end
 
+               % Plot 
+               % Check for any new subgraphs as a result of pruning
+               prev_closed = subgraphs_closed;
+               subgraphs_closed = active_set.getResultGraphs().size();
+               if  subgraphs_closed > prev_closed
+                   % plot out the new closed off subgraphs
+                   % we don't save their handles as we aren't
+                   % planning on deleting them (yet at least)
+                   for k = prev_closed:(subgraphs_closed-1)
+                       g = active_set.getResultGraphs().get(k);
+                       dtPlotGraph(g, ...
+                               'ColorMap', cmap, 'LineStyle', '-', ...
+                               'ColorIdx', coloridx, 'Marker', '.', ...
+                               'DistinguishEdges', false);
+                   end
+               end               
+           end
+       end
+       if Plot > 0
+           if ~ isempty(MovieH)
+               FrameH = getframe(MovieFig, MoviePosition);
+               MovieH = addframe(MovieH, FrameH);
+           end
+           if Interactive && peakN > 0
+               fprintf('paused after frame at %f\n', current_s);
+               drawnow;
+               pause;
+           else
+               drawnow;
+           end
+       end
     end % end for frame_idx
     StartBlock_s = Indices.timeidx(end) + Advance_s - shift_samples_s;  % Set time for next block
-   
+    if (callbackSet)
+        SPCallback.block_completed();
+    end
 end  % for block_idx
 
 if ~ isempty(MovieH)
@@ -692,9 +797,11 @@ while it.hasNext()
         end
     end
 end
+
 if ~ isempty(tonal_h)
     tonal_h.close();
 end
+
 disambiguate_s = toc(stopwatch);
 
 % print summary

@@ -138,6 +138,5 @@ for idx=1:length(gt) %1:length(gt)
     fprintf('\nElapsed time since start:  %s\n', sectohhmmss(toc(start_t)));
     
 end
-save('results.mat', 'results');
 diary off;
 

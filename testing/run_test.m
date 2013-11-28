@@ -7,8 +7,8 @@ end
 import tonals.*;
 
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/filter_test/';
-base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/trouble/';
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
+base_dir = '/Users/michael/development/sdsu/silbido/corpora/trouble/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short_beaked/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short-test/';
@@ -23,6 +23,7 @@ test_files = getAllFiles(base_dir, '.wav');
 for i = 1:size(test_files,1)
     input_file = test_files{i};
     fprintf('Tracking Tonals for file %s ...', input_file);
+    
     [detectedTonals, graphs] = dtTonalsTracking(input_file,0,Inf);
     
     [path, name, ~] = fileparts(input_file);
