@@ -7,7 +7,7 @@ classdef DebugRenderingManager < handle
       active_set_peak_handles;
       orphan_set_peak_handles;
       status_marker_handle;
-      broadband_peak_handles;
+      progress_handles;
       active_graph_handles;
       orphan_graph_handles;
       
@@ -24,7 +24,7 @@ classdef DebugRenderingManager < handle
           cb.new_peak_handles = [];
           cb.active_set_peak_handles = [];
           cb.orphan_set_peak_handles = [];
-          cb.broadband_peak_handles = [];
+          cb.progress_handles = [];
           cb.active_graph_handles = [];
           cb.orphan_graph_handles = [];
           
@@ -34,7 +34,8 @@ classdef DebugRenderingManager < handle
       end
       
       function blockStarted(cb, spectrogram, start_s, end_s)
-          
+          set(cb.handles.blockStartTimeField, 'String', sprintf('%.5fs', start_s));
+          set(cb.handles.blockEndTimeField, 'String', sprintf('%.5fs', end_s));
       end % process_block_begin
       
       function blockCompleted(cb)
@@ -65,18 +66,19 @@ classdef DebugRenderingManager < handle
               plot(cb.handles.progressAxes, ... 
                   [current_s current_s], ...
                   [0,1],...
-                  'g-');
+                  'b-');
           set(cb.handles.progressAxes, 'xlim', get(cb.handles.spectrogram, 'xlim'));
-          set(cb.handles.timeField, 'String', sprintf('%fs', current_s));
+          set(cb.handles.frameStartTimeField, 'String', sprintf('%.5fs', current_s));
+          set(cb.handles.frameEndTimeField, 'String', sprintf('%.5fs', current_s + cb.thr.advance_s));
           drawnow update;
       end
       
       function handleBroadbandFrame(cb, current_s)
-          cb.broadband_peak_handles(end+1) = ...
+          cb.progress_handles(end+1) = ...
               plot(cb.handles.progressAxes, ...
                   [current_s current_s], ...
                   [0,1], ...
-                  'm-');
+                  'r-');
           drawnow update;
       end
       
@@ -86,7 +88,11 @@ classdef DebugRenderingManager < handle
               current_time(ones(size(peaks))),...
               peaks/1000, ...
               'r^');
-          
+          cb.progress_handles(end+1) = ...
+              plot(cb.handles.progressAxes, ...
+                  [current_time current_time], ...
+                  [0,1], ...
+                  'g-');
           drawnow update;
       end
       
@@ -161,9 +167,9 @@ classdef DebugRenderingManager < handle
               cb.new_peak_handles = {};
           end
           
-          if (~isempty(cb.broadband_peak_handles))
-              delete(cb.broadband_peak_handles);     % remove plots from last iteration
-              cb.broadband_peak_handles = [];
+          if (~isempty(cb.progress_handles))
+              delete(cb.progress_handles);     % remove plots from last iteration
+              cb.progress_handles = [];
           end
           
           if (~isempty(cb.active_graph_handles))
@@ -185,6 +191,11 @@ classdef DebugRenderingManager < handle
               delete(cb.orphan_set_peak_handles);
               cb.orphan_set_peak_handles = [];
           end
+          
+          set(cb.handles.frameStartTimeField, 'String', '');
+          set(cb.handles.frameEndTimeField, 'String', '');
+          set(cb.handles.blockStartTimeField, 'String', '');
+          set(cb.handles.blockEndTimeField, 'String', '');
       end
       
       function handles = plot_graph(cb, set, style, colorixd)

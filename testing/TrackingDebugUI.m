@@ -1,13 +1,13 @@
 function varargout = TrackingDebugUI(varargin)
 % TrackingDebugUI(AudioFilename, OptionalArguments)
-% Whistle/Tonal annotation tool
+% Whistle/Tonal trackingdebug tool
 
 % Note:
 % This function requires TrackingDebugUI.fig to be present and uses
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 28-Nov-2013 08:59:39
+% Last Modified by GUIDE v2.5 29-Nov-2013 13:21:57
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -62,9 +62,11 @@ data.NoiseMethod = {'median'};
 data.SpecgramColormap = bone();
 data.scale = 1000; % kHz
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Filename Handling
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Filename = varargin{1};
-
-
 if isempty(Filename)
     [Filename, FileDir] = uigetfile('.wav', 'Develop ground truth for file');
     if isnumeric(Filename)
@@ -79,10 +81,11 @@ else
     data.Filename = Filename;
 end
 
-
-
 [fdir, fname] = fileparts(data.Filename);
 data.hdr = ioReadWavHeader(data.Filename);
+
+
+
 % defaults
 data.Start_s = 0;
 data.Stop_s = data.hdr.Chunks{data.hdr.dataChunk}.nSamples/data.hdr.fs;
@@ -98,6 +101,21 @@ data.thr.advance_s = data.thr.advance_ms / data.ms_per_s;
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% processs arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+k = 2;
+while k <= length(varargin)
+    switch varargin{k}
+        case 'ViewStart'
+            viewStartSeconds = varargin{k+1};
+            k=k+2;
+        case 'ViewLength'
+            viewLengthSeconds = varargin{k+1};
+            k=k+2;
+        otherwise
+            error('Unknown paramters %s', varargin{k});
+    end
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Variables
@@ -108,27 +126,33 @@ data.high_disp_Hz = data.thr.high_cutoff_Hz;
 set(handles.High, 'String', num2str(data.high_disp_Hz));
 
 
-
-% Vectors for undo operation
-data.undo = struct('before', {}, 'after', {});
 handles.colorbar = [];
 handles.image = [];
 
-set(handles.Annotation, 'Name', sprintf('%s%s Annotation [%s]', ...
+set(handles.TrackingDebug, 'Name', sprintf('%s%s Annotation [%s]', ...
     data.FigureTitle, fname, fdir));
 
 % I've observed some problems that may be due to a race condition.
 % Try setting children's busyaction to cancel
-children = setdiff(findobj(handles.Annotation, 'BusyAction', 'queue'), ...
-    handles.Annotation);
+children = setdiff(findobj(handles.TrackingDebug, 'BusyAction', 'queue'), ...
+    handles.TrackingDebug);
 set(children, 'BusyAction', 'cancel')
 
 data.breakpoints = [];
+data.stepAction = 0; % 0=detect peaks, 1=prune and extend.
 
 data.debugRenderingManager = DebugRenderingManager(handles, data.thr);
 data.stopRequested = false;
 data.pauseRequested = false;
 hold(handles.progressAxes, 'on');
+
+data.Start_s = start_in_range(viewStartSeconds, handles, data);
+set(handles.Start_s, 'String', num2str(data.Start_s));
+
+data.ViewLength_s = viewLengthSeconds;
+set(handles.ViewLength_s, 'String', num2str(viewLengthSeconds));
+
+
 SaveDataInFigure(handles, data);  % save user/figure data before plot
 [handles, data] = spectrogram(handles, data);
 SaveDataInFigure(handles, data);
@@ -195,7 +219,7 @@ function High_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 high = str2double(get(hObject,'String'));
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 if isnan(high)
     report(hObject, handles, 'Invalid high range');
     set(hObject, 'String', str2double(data.high_disp_Hz));
@@ -204,7 +228,7 @@ elseif high < data.low_disp_Hz
     set(hObject, 'String', str2double(data.high_disp_Hz));
 else    
     data.high_disp_Hz = high;
-    set(handles.Annotation, 'UserData', data);
+    set(handles.TrackingDebug, 'UserData', data);
 end
 
 
@@ -229,7 +253,7 @@ function Low_Callback(hObject, eventdata, handles)
 % Set lower plot limit for spectrogram
 
 low = str2double(get(hObject,'String'));
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 if isnan(low)
     report(hObject, handles, 'Invalid low range');
     set(hObject, 'String', str2double(data.low_disp_Hz));
@@ -238,7 +262,7 @@ elseif low >= data.high_disp_Hz
     set(hObject, 'String', str2double(data.low_disp_Hz));
 else    
     data.low_disp_Hz = low;
-    set(handles.Annotation, 'UserData', data);
+    set(handles.TrackingDebug, 'UserData', data);
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -269,7 +293,7 @@ if isnan(length_s);
     report(hObject, handles, 'Bad plot length.');
     set(hObject, 'String', num2str(length_s));
 else
-    data = get(handles.Annotation, 'UserData');
+    data = get(handles.TrackingDebug, 'UserData');
     [handles, data] = spectrogram(handles, data);
     SaveDataInFigure(handles, data);
 end
@@ -320,11 +344,11 @@ function Start_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Set start time to earliest specified by the user.
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 % See what we are currently starting at
 if data.Start_s ~= 0
     data.Start_s = 0;
-    set(handles.Annotation, 'UserData', data);
+    set(handles.TrackingDebug, 'UserData', data);
     set(handles.Start_s, 'String', num2str(data.Start_s));
     [handles, data] = spectrogram(handles, data);
     SaveDataInFigure(handles, data);
@@ -338,7 +362,7 @@ function Rewind_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 % Rewind by specified Advance/Rewind frame parameters
 
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 advance_s = getAdvance_s(handles);
 new_s = start_in_range(data.Start_s - advance_s, handles, data);
 if data.Start_s ~= new_s
@@ -355,7 +379,7 @@ function Advance_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Set start time to earliest specified by the user.
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 advance_s = getAdvance_s(handles);
 new_s = start_in_range(data.Start_s + advance_s, handles, data);
 if data.Start_s ~= new_s
@@ -372,7 +396,7 @@ function End_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Set start time to earliest specified by the user.
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 % See what we are currently starting at
 current_s = str2double(get(handles.Start_s, 'String'));
 latest_start = start_in_range(data.Stop_s, handles, data);
@@ -397,7 +421,7 @@ contrast = get(handles.Contrast, 'Value');
 set(handles.BrightnessValue, 'String', num2str(brightness));
 handles.colorbar = colorbar('peer', handles.spectrogram);
 dtBrightContrast(handles.image, brightness, contrast, -Inf, handles.colorbar);
-guidata(handles.Annotation, handles);
+guidata(handles.TrackingDebug, handles);
 
 % --- Executes during object creation, after setting all properties.
 function Brightness_CreateFcn(hObject, eventdata, handles)
@@ -424,7 +448,7 @@ contrast = get(hObject, 'Value');
 set(handles.ContrastValue, 'String', num2str(contrast));
 handles.colorbar = colorbar('peer', handles.spectrogram);
 dtBrightContrast(handles.image, brightness, contrast, -Inf, handles.colorbar);
-guidata(handles.Annotation, handles);
+guidata(handles.TrackingDebug, handles);
 
 % --- Executes during object creation, after setting all properties.
 function Contrast_CreateFcn(hObject, eventdata, handles)
@@ -516,7 +540,7 @@ function Start_s_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of Start_s as text
 %        str2double(get(hObject,'String')) returns contents of Start_s as a double
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 start_s = str2double(get(hObject, 'String'));
 if isnan(start_s)
     report(hObject, handles, 'Bad start time');
@@ -555,7 +579,7 @@ function openAudioFile_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % TODO:  Add warning if there are unsaved annotatations as they will be lost
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 
 if (strcmp(data.Mode, 'annotate') == 1)
     [Filename, FileDir] = uigetfile('.wav', 'Audio file to create/view annotations');
@@ -608,11 +632,11 @@ function Detect_Callback(hObject, eventdata, handles)
 % hObject    handle to Detect (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 
 % wait pointer
-pointer = get(handles.Annotation, 'Pointer');
-set(handles.Annotation, 'Pointer', 'watch');
+pointer = get(handles.TrackingDebug, 'Pointer');
+set(handles.TrackingDebug, 'Pointer', 'watch');
 
 % Remove any plotted ones
 drawnow update expose;
@@ -623,15 +647,15 @@ end_s = start_s + str2double(get(handles.ViewLength_s, 'String'));
 
 data.annotations = ...
     dtTonalsTracking(data.Filename, start_s, end_s, 'ParameterSet', data.thr, 'SPCallback', callback);
-set(handles.Annotation, 'UserData', data);
+set(handles.TrackingDebug, 'UserData', data);
 
 
 SaveDataInFigure(handles, data);
 
 % Restore pointer
-set(handles.Annotation, 'Pointer', pointer);
+set(handles.TrackingDebug, 'Pointer', pointer);
 
-function Annotation_KeyPressFcn(hObject, eventdata, handles)
+function TrackingDebug_KeyPressFcn(hObject, eventdata, handles)
 
 
 function detect_process_block(handles, spectrogram, start_s, end_s)
@@ -665,7 +689,7 @@ function audioFilenameToClipboard_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 clipboard('copy', data.Filename);
 
 
@@ -675,7 +699,7 @@ function annotationFilenameToClipboard_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 clipboard('copy', data.AnnotationFile);
 
 
@@ -695,8 +719,8 @@ function [handles, data] = spectrogram(handles, data)
 % Plot spectrogram and add annotations
 
 % wait pointer
-pointer = get(handles.Annotation, 'Pointer');
-set(handles.Annotation, 'Pointer', 'watch');
+pointer = get(handles.TrackingDebug, 'Pointer');
+set(handles.TrackingDebug, 'Pointer', 'watch');
 drawnow update;
 
 spH = handles.spectrogram;
@@ -767,7 +791,7 @@ set(axisH, 'Children', ...
 
 set(handles.image, 'buttondownfcn', @spectrogram_ButtonDownFcn);
 
-set(handles.Annotation, 'Pointer', pointer);
+set(handles.TrackingDebug, 'Pointer', pointer);
 
 spectrogramPos = get(axisH, 'Position');
 get(handles.progressAxes, 'Position');
@@ -902,8 +926,8 @@ function SaveDataInFigure(handles, data)
 % Save the handles/data structures as GUI and user data in the 
 % figure
 
-guidata(handles.Annotation, handles);
-set(handles.Annotation, 'UserData', data);
+guidata(handles.TrackingDebug, handles);
+set(handles.TrackingDebug, 'UserData', data);
 
 
 % --------------------------------------------------------------------
@@ -923,7 +947,7 @@ handles = guidata(src);
 cursorPoint = get(handles.spectrogram, 'CurrentPoint');
 curX = cursorPoint(1,1);
 
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 
 % TODO make this range smaller
 intervals = data.blkstart_s:(data.thr.advance_ms / 1000):data.blkstop_s;
@@ -985,12 +1009,12 @@ function deleteBreakpoint_Callback(hObject, eventdata, handles)
 
 
 % --------------------------------------------------------------------
-function detectButton_ClickedCallback(hObject, eventdata, handles)
-% hObject    handle to detectButton (see GCBO)
+function runButton_ClickedCallback(hObject, eventdata, handles)
+% hObject    handle to runButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 data.stopRequested = false;
 data.pauseRequested = false;
 data.debugRenderingManager.clearAll();
@@ -1003,10 +1027,10 @@ execute(handles);
 
 
 function execute(handles)
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 tt = data.tt;
 
-set(handles.detectButton,'Enable','off');
+set(handles.runButton,'Enable','off');
 set(handles.stopButton,'Enable','on');
 set(handles.stepButton,'Enable','off');
 set(handles.resetButton,'Enable','off');
@@ -1016,31 +1040,51 @@ SaveDataInFigure(handles, data);
 drawnow;
 
 peaks_only = get(handles.peaksOnlyCheckBox, 'Value');
+break_on_peaks = get(handles.breakOnPeaksCheckBox, 'Value');
+
 
 while (~data.stopRequested && ~data.pauseRequested)
     frame_time = tt.getCurrentFrameTime();
-    data = get(handles.Annotation, 'UserData');
+    data = get(handles.TrackingDebug, 'UserData');
     breakpoints = data.breakpoints;
     if (breakpoints(breakpoints == frame_time))
         data.pauseRequested = true;
         break;
     end
     
-    found = tt.selectPeaks();
-    if (found && ~peaks_only)
-        tt.pruneAndExtend();
+    if (data.stepAction == 0)
+        found = tt.selectPeaks();
+        if (found)
+            if (break_on_peaks)
+                data.pauseRequested = true;
+                data.stepAction = 1;
+                break;
+            end
+            if(~peaks_only)
+                tt.pruneAndExtend();
+            end
+        end
+    else
+        % This happens when the user hit continue after being broken
+        % after peak detection but before prune and extend.  This can
+        % happen when stepping but also when breaking on peaks.
+        if (~isempty(tt.getCurrentFramePeakFreqs()) && ~peaks_only)
+            tt.pruneAndExtend();
+        end
     end
     
     if (tt.hasMoreFrames())
         tt.advanceFrame();
+        data.stepAction = 0;
     else
         break;
     end
+    SaveDataInFigure(handles, data);
     drawnow;
 end
 
 if (~data.pauseRequested)
-    set(handles.detectButton,'Enable','on');
+    set(handles.runButton,'Enable','on');
     set(handles.resetButton,'Enable','on');
     set(handles.stopButton,'Enable','off');
     set(handles.stepButton,'Enable','off');
@@ -1049,7 +1093,7 @@ else
     set(handles.stepButton,'Enable','on');
     set(handles.pauseButton,'Enable','off');
     set(handles.continueButton,'Enable','on');
-    set(handles.detectButton,'Enable','off');
+    set(handles.runButton,'Enable','off');
     set(handles.resetButton,'Enable','off');
     data.pauseRequested = false;
 end
@@ -1061,13 +1105,13 @@ function stopButton_ClickedCallback(hObject, eventdata, handles)
 % hObject    handle to stopButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 data.stopRequested = true;
 set(handles.stepButton,'Enable','off');
 set(handles.stopButton,'Enable','off');
-set(handles.detectButton,'Enable','on');
+set(handles.runButton,'Enable','on');
 set(handles.resetButton,'Enable','on');
-set(handles.timeField, 'String', '');
+set(handles.frameStartTimeField, 'String', '');
 SaveDataInFigure(handles, data);
 drawnow;
 
@@ -1077,13 +1121,26 @@ function stepButton_ClickedCallback(hObject, eventdata, handles)
 % hObject    handle to stepButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 tt = data.tt;
 peaks_only = get(handles.peaksOnlyCheckBox, 'Value');
-if (tt.hasNextStep())
-    tt.step(peaks_only);
+stepMode = 0;
+if (tt.hasMoreFrames())
+    switch stepMode
+        case 0
+            if (data.stepAction == 0)
+                tt.selectPeaks();
+            else
+                if (~isempty(tt.getCurrentFramePeakFreqs()))
+                    tt.pruneAndExtend();
+                end
+                tt.advanceFrame();
+            end
+            
+            data.stepAction = mod(data.stepAction + 1, 2);
+    end
 end
-if (~tt.hasNextStep())
+if (~tt.hasMoreFrames())
     set(handles.stepButton,'Enable','off');
 end
 SaveDataInFigure(handles, data);
@@ -1108,7 +1165,7 @@ function noiseCompMenu_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns noiseCompMenu contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from noiseCompMenu
 
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 selectedIdx = get(handles.noiseCompMenu, 'Value');
 values = get(handles.noiseCompMenu, 'String');
 selectedValue = values(selectedIdx);
@@ -1137,27 +1194,27 @@ function resetButton_ClickedCallback(hObject, eventdata, handles)
 % hObject    handle to resetButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 data.debugRenderingManager.clearAll();
 set(handles.resetButton,'Enable','off');
-set(handles.timeField, 'String', '');
+set(handles.frameStartTimeField, 'String', '');
 SaveDataInFigure(handles, data);
 drawnow;
 
 
 
-function timeField_Callback(hObject, eventdata, handles)
-% hObject    handle to timeField (see GCBO)
+function frameStartTimeField_Callback(hObject, eventdata, handles)
+% hObject    handle to frameStartTimeField (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of timeField as text
-%        str2double(get(hObject,'String')) returns contents of timeField as a double
+% Hints: get(hObject,'String') returns contents of frameStartTimeField as text
+%        str2double(get(hObject,'String')) returns contents of frameStartTimeField as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function timeField_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to timeField (see GCBO)
+function frameStartTimeField_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to frameStartTimeField (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -1173,11 +1230,11 @@ function pauseButton_ClickedCallback(hObject, eventdata, handles)
 % hObject    handle to pauseButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-data = get(handles.Annotation, 'UserData');
+data = get(handles.TrackingDebug, 'UserData');
 data.pauseRequested = true;
 set(handles.stepButton,'Enable','on');
 set(handles.stopButton,'Enable','on');
-set(handles.detectButton,'Enable','off');
+set(handles.runButton,'Enable','off');
 set(handles.resetButton,'Enable','off');
 set(handles.pauseButton,'Enable','off');
 SaveDataInFigure(handles, data);
@@ -1199,3 +1256,112 @@ function continueButton_ClickedCallback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 execute(handles);
+
+
+% --- Executes on selection change in stepModeMenu.
+function stepModeMenu_Callback(hObject, eventdata, handles)
+% hObject    handle to stepModeMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns stepModeMenu contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from stepModeMenu
+
+
+% --- Executes during object creation, after setting all properties.
+function stepModeMenu_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to stepModeMenu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in showFitCheckBox.
+function showFitCheckBox_Callback(hObject, eventdata, handles)
+% hObject    handle to showFitCheckBox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of showFitCheckBox
+
+
+
+function frameEndTimeField_Callback(hObject, eventdata, handles)
+% hObject    handle to frameEndTimeField (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of frameEndTimeField as text
+%        str2double(get(hObject,'String')) returns contents of frameEndTimeField as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function frameEndTimeField_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to frameEndTimeField (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function blockStartTimeField_Callback(hObject, eventdata, handles)
+% hObject    handle to blockStartTimeField (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of blockStartTimeField as text
+%        str2double(get(hObject,'String')) returns contents of blockStartTimeField as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function blockStartTimeField_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to blockStartTimeField (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function blockEndTimeField_Callback(hObject, eventdata, handles)
+% hObject    handle to blockEndTimeField (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of blockEndTimeField as text
+%        str2double(get(hObject,'String')) returns contents of blockEndTimeField as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function blockEndTimeField_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to blockEndTimeField (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes when TrackingDebug is resized.
+function TrackingDebug_ResizeFcn(hObject, eventdata, handles)
+% hObject    handle to TrackingDebug (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+fprintf('resized\n');

@@ -171,7 +171,8 @@ classdef TonalTracker < handle
             % Get header information of the file and then open file as little endian
             tt.header = ioReadWavHeader(Filename);
             tt.handle = fopen(Filename, 'rb', 'l');
-            tt.Stop_s = min(Stop_s, tt.header.Chunks{tt.header.dataChunk}.nSamples/tt.header.fs);
+            file_end_s = tt.header.Chunks{tt.header.dataChunk}.nSamples/tt.header.fs;
+            tt.Stop_s = min(Stop_s, file_end_s);
             
             if (tt.Start_s >= tt.Stop_s)
                 error('Stop_s should be greater then Start');
@@ -225,11 +226,15 @@ classdef TonalTracker < handle
 
             tt.StartBlock_s = tt.Start_s;
             tt.frame_idx = 0;
+            
+            fprintf('\nFile length %.5f\n', file_end_s);
+            fprintf('Processing file from %.5f to %.5f\n', tt.Start_s, tt.Stop_s);
         end
         
         function startBlock(tt)
              % Retrieve the data for this block
             tt.StopBlock_s = min(tt.StartBlock_s + tt.block_padded_s, tt.Stop_s);
+            fprintf('Processing block from %.5f to %.5f\n', tt.StartBlock_s, tt.StopBlock_s);
             %extra = ((tt.Length_s / tt.Advance_s) + 1) * tt.Advance_s;
             %tt.StopBlock_s = min(tt.StopBlock_s + extra)
             Signal = ioReadWav(tt.handle, tt.header, tt.StartBlock_s, tt.StopBlock_s, ...
@@ -248,11 +253,16 @@ classdef TonalTracker < handle
             % advance, to get to the first frame.
             tt.frame_idx = 0;
             tt.advanceFrameInBlock();
+            if (tt.callbackSet)
+               tt.SPCallback.blockStarted(tt.snr_power_dB,tt.StartBlock_s,tt.StopBlock_s);
+            end
         end
         
         
         function foundPeaks = selectPeaks(tt)
            foundPeaks = false;
+           tt.current_frame_peak_bins = [];
+           tt.current_frame_peak_freqs = [];
         
            % no smoothing for now, but pretend anyway
            tt.smoothed_dB = tt.snr_power_dB(:, tt.frame_idx);
@@ -293,6 +303,10 @@ classdef TonalTracker < handle
                end
            end
         end
+        
+        function freqs = getCurrentFramePeakFreqs(tt)
+            freqs = tt.current_frame_peak_freqs;
+        end
            
         function pruneAndExtend(tt)
             if (~isempty(tt.current_frame_peak_bins))
@@ -300,9 +314,6 @@ classdef TonalTracker < handle
                % examine active list and see if anything needs to be removed
                % or moved to the list of whistles
                tt.active_set.prune(tt.current_s, tt.thr.minlen_s, tt.thr.maxgap_s);
-               if (tt.callbackSet)
-                   tt.SPCallback.handleActiveSetExtension(tt.active_set);
-               end
                
                import tonals.*;
                % Create TreeSet of time-frequency nodes for peaks
@@ -317,6 +328,9 @@ classdef TonalTracker < handle
                % Link anything possible from the current active set to the
                % new peaks then add them to the active set.            
                tt.active_set.extend(peak_list, tt.thr.maxslope_Hz_per_ms, tt.thr.activeset_s);
+               if (tt.callbackSet)
+                   tt.SPCallback.handleActiveSetExtension(tt.active_set);
+               end
             end
         end
         
@@ -329,10 +343,13 @@ classdef TonalTracker < handle
         end
         
         function completeBlock(tt)
-            tt.StartBlock_s = tt.Indices.timeidx(end) + tt.Advance_s - tt.shift_samples_s;
             if (tt.callbackSet)
                 tt.SPCallback.blockCompleted();
             end
+        end
+        
+        function advanceBlock(tt)
+            tt.StartBlock_s = tt.Indices.timeidx(end) + tt.Advance_s - tt.shift_samples_s;
         end
         
         function processBlock(tt)
@@ -349,7 +366,9 @@ classdef TonalTracker < handle
         end
         
         function hasNext = hasNextBlock(tt)
-            hasNext = tt.StartBlock_s + 2 * tt.Length_s < tt.Stop_s;
+            %hasNext = tt.StartBlock_s + 2 * tt.Length_s < tt.Stop_s;
+            % This is a hack.
+            hasNext = tt.StartBlock_s + tt.block_padded_s + 2 * tt.Length_s < tt.Stop_s;
         end
         
         function hasNext = blockHasNextFrame(tt)
@@ -377,6 +396,7 @@ classdef TonalTracker < handle
                     tt.completeBlock();
                 end
             elseif (tt.hasNextBlock())
+                tt.advanceBlock();
                 tt.startBlock();
             else
                 error('Cannont advance frame');
@@ -384,8 +404,10 @@ classdef TonalTracker < handle
         end
                         
         function processFile(tt)
-            while (tt.hasNextBlock())
-                tt.processBlock();                
+            tt.startBlock();
+            while (tt.hasMoreFrames())
+                tt.advanceFrame();
+                tt.processCurrentFrame();
             end
             tt.finalizeTracking();
         end
