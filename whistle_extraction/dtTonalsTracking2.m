@@ -184,7 +184,8 @@ block_len_s = thr.blocklen_s;  % amount of data considered in each block
 % Get header information of the file and then open file as little endian
 header = ioReadWavHeader(Filename);
 handle = fopen(Filename, 'rb', 'l');
-Stop_s = min(Stop_s, header.Chunks{header.dataChunk}.nSamples/header.fs);
+file_end_s = header.Chunks{header.dataChunk}.nSamples/header.fs;
+Stop_s = min(Stop_s, file_end_s);
 if (Start_s >= Stop_s)
     error('Stop_s should be greater then Start');
 end
@@ -239,7 +240,9 @@ peakN_last_processed = range_binsN * 0.25;
 
 StartBlock_s = Start_s;
 
-    
+fprintf('File length %.5f\n', file_end_s);
+fprintf('Processing file from %.5f to %.5f\n', Start_s, Stop_s);
+
 % Seem to be having problem getting to stop time due to
 % incomplete frames.  For now kludge in a little padding
 % to stop just before stop time.  Bhavesh, please fix.
@@ -250,6 +253,8 @@ while StartBlock_s + 2 * Length_s < Stop_s
 
     % Retrieve the data for this block
     StopBlock_s = min(StartBlock_s + block_padded_s, Stop_s);
+    fprintf('Processing block from %.5f to %.5f\n', StartBlock_s, StopBlock_s);
+    
     Signal = ioReadWav(handle, header, StartBlock_s, StopBlock_s, ...
         'Units', 's', 'Channels', channel);
     

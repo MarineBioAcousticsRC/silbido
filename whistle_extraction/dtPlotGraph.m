@@ -49,7 +49,7 @@ function [handles, cidx]= dtPlotGraph(tonal_collection, varargin)
         freq = tonal.get_freq() / scale;
         switch PlotType
             case 'edge'
-                handles{hidx} = plot(time, freq, ...
+                handles{hidx} = plot(AxisH, time, freq, ...
                     'LineStyle', LineStyle, 'Marker', Marker, ...
                     'Color', ColorMap(cidx, :), ...
                     'LineWidth', LineWidth);
@@ -88,6 +88,8 @@ PlotType = 'edge';
 EdgeCallback = [];
 Marker = 'none';
 LineWidth = 4;
+AxisH = gca;
+
 if nargin < 1
     error('A graph to plot must be specified');
 end
@@ -95,6 +97,8 @@ end
 k = 1;
 while k <= length(varargin)
     switch varargin{k}
+        case 'Axis'
+            AxisH = varargin{k+1}; k=k+2;
         case 'EdgeCallback'
             EdgeCallback = varargin{k+1}; k=k+2;
         case 'ColorMap'

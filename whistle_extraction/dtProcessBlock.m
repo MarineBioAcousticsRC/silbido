@@ -41,8 +41,9 @@ shift_samples = 0;
 NoiseSub = {};
 noise_bins_N = 0;
 noise_intensity_dB = 0;
-range_bins = [1:floor(Length_samples/2)];
+range_bins = 1:floor(Length_samples/2);
 RemoveTransients = false;
+RemovalMethod = 'poly';
 
 % We cannot use the serial dates as they may contain duty cycling.
 % The alternatives are to find the duty cycles and subtract the missing
@@ -71,6 +72,8 @@ while vidx < length(varargin)
             shift_samples = varargin{vidx+1}; vidx=vidx+2;
         case 'Noise'
             NoiseSub = varargin{vidx+1}; vidx=vidx+2;
+        case 'RemovalMethod'
+            RemovalMethod = varargin{vidx+1}; vidx=vidx+2;
         otherwise
             error('Bad optional argument');
     end
@@ -89,6 +92,31 @@ end
 Signal = ioReadWav(handle, header, start, stop, ...
     'Units', 's', 'Channels', channel);
 
+if (false)
+    w = zeros(size(Signal));
+    p = 6;
+    t = 5;
+    s_len = length(Signal);
+    window_len = 512;
+    windows = ceil(s_len/window_len);
+    for window_num=1:windows
+        window_start = (window_num - 1) * window_len + 1;
+        window_end = min(s_len, window_start+511);
+        window = Signal(window_start:window_end);
+        m = mean(window);
+        sd = std(window);
+        for idx=window_start:(window_start+511)
+            if (idx > s_len)
+                break;
+            end
+            w(idx) = 1 / (1 + ((Signal(idx) - m)/(t * sd))^p);
+        end
+    end
+
+    Signal = Signal .* w;
+end
+
+% Remove transients such as echolocation clicks
 % Build filter to detect transients such as echolocation clicks
 % Todo:  Have filter passed in as a parameter and only construct once.
 if RemoveTransients
@@ -96,10 +124,6 @@ if RemoveTransients
     d = fdesign.highpass(5000, 10000, 60, 3, header.fs);  % filter specification
     hd = design(d, 'cheby1');  % design to specification
     
-end
-
-% Remove transients such as echolocation clicks
-if RemoveTransients
     SignalHP = filter(hd, Signal); % high pass filter the signal
     Teager = abs(spTeagerEnergy(SignalHP));  % half-wave rectifiied Teager Energy
     % estimate noise floor - Our click detector uses the 40th percentile,
@@ -122,7 +146,6 @@ if RemoveTransients
     MaxClickLen_s = .002;
     selected = label == 1 & leng < MaxClickLen_s/(1/header.fs) & leng > smooth_N;
     
-    RemovalMethod = 'poly';
     Rm = find(selected);
     debug = false;
     if debug

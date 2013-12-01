@@ -10,6 +10,8 @@ classdef DebugRenderingManager < handle
       progress_handles;
       active_graph_handles;
       orphan_graph_handles;
+      fit_plot_handles;
+      fit_plots_enabled;
       
       subgraphs_closed;
       
@@ -27,10 +29,12 @@ classdef DebugRenderingManager < handle
           cb.progress_handles = [];
           cb.active_graph_handles = [];
           cb.orphan_graph_handles = [];
+          cb.fit_plot_handles = [];
           
           cb.subgraphs_closed = 0; 
           
           cb.cmap = [[0 1 1];[1 0 1]];
+          cb.fit_plots_enabled = false;
       end
       
       function blockStarted(cb, spectrogram, start_s, end_s)
@@ -52,7 +56,9 @@ classdef DebugRenderingManager < handle
           drawnow update;
       end % block_completed
       
-      function frameAdvanced(cb, current_s)
+      function frameAdvanced(cb,tt)
+          current_s = tt.current_s;
+          cb.clearFits();
           if (cb.status_marker_handle > 0)
                delete(cb.status_marker_handle);
           end
@@ -67,9 +73,15 @@ classdef DebugRenderingManager < handle
                   [current_s current_s], ...
                   [0,1],...
                   'b-');
-          set(cb.handles.progressAxes, 'xlim', get(cb.handles.spectrogram, 'xlim'));
+          
+          %set(cb.handles.progressAxes, 'xlim', get(cb.handles.spectrogram, 'xlim'));
           set(cb.handles.frameStartTimeField, 'String', sprintf('%.5fs', current_s));
           set(cb.handles.frameEndTimeField, 'String', sprintf('%.5fs', current_s + cb.thr.advance_s));
+          
+          if (cb.fit_plots_enabled)
+              cb.plotFits(tt);
+          end
+          
           drawnow update;
       end
       
@@ -84,7 +96,7 @@ classdef DebugRenderingManager < handle
       
       function handleFramePeaks(cb, current_time, peaks)
           % Plot the peaks that were just detected.
-          cb.new_peak_handles = plot(...
+          cb.new_peak_handles = plot(cb.handles.spectrogram,...
               current_time(ones(size(peaks))),...
               peaks/1000, ...
               'r^');
@@ -96,7 +108,8 @@ classdef DebugRenderingManager < handle
           drawnow update;
       end
       
-      function handleActiveSetExtension(cb, active_set)
+      function handleActiveSetExtension(cb, tt)
+          active_set = tt.getActiveSet();
           if (~isempty(cb.active_graph_handles))
               delete(cb.active_graph_handles);
               cb.active_graph_handles = [];
@@ -118,21 +131,25 @@ classdef DebugRenderingManager < handle
           end
           
           cb.active_graph_handles = cb.plot_graph(...
-               active_set.getActiveSet(), ...
-               '-',2);
+              cb.handles.spectrogram, ...
+              active_set.getActiveSet(), ...
+              '-',2);
            
             % Plot the peaks that are currently in the active set.
           cb.active_set_peak_handles = plot(...
+              cb.handles.spectrogram,...
               active_set.getActiveSet().get_time(), ...
               active_set.getActiveSet().get_freq/1000, ...
               'g*');
 
           cb.orphan_graph_handles = cb.plot_graph(...
+              cb.handles.spectrogram, ...
               active_set.getOrphanSet(), ...
               '-',1);
            
           % Plot the peaks that are currently in the orphan set.
           cb.orphan_set_peak_handles = plot(...
+              cb.handles.spectrogram, ...
               active_set.getOrphanSet().get_time(), ...
               active_set.getOrphanSet().get_freq/1000, ...
               'y*');
@@ -157,6 +174,11 @@ classdef DebugRenderingManager < handle
       end
       
       function clearAll(cb)
+          if (~isempty(cb.fit_plot_handles))
+              delete(cb.fit_plot_handles);
+              cb.fit_plot_handles = [];
+          end
+          
           if (cb.status_marker_handle > 0)
               delete(cb.status_marker_handle);
               cb.status_marker_handle = -1;
@@ -198,7 +220,44 @@ classdef DebugRenderingManager < handle
           set(cb.handles.blockEndTimeField, 'String', '');
       end
       
-      function handles = plot_graph(cb, set, style, colorixd)
+      function plotFits(cb, tt)
+          activeSet = tt.getActiveSet();
+          frontier = activeSet.getMergedFrontier();
+          it = frontier.iterator();
+          while it.hasNext()
+              node = it.next();
+              if (node.chained_forward())
+                  continue;
+              end
+              fits = activeSet.getFitsForNode(node,0.025);
+              fitIteraror = fits.iterator();
+              while fitIteraror.hasNext()
+                  fit = fitIteraror.next();
+                  times = node.time:tt.Advance_s:tt.current_s;
+                  freqs = zeros(size(times));
+                  for idx = 1:length(times)
+                      freqs(idx) = fit.predict(times(idx));
+                  end
+
+                  cb.fit_plot_handles(end+1) = plot(...
+                      cb.handles.spectrogram, ...
+                      times, ...
+                      freqs/1000, ...
+                      'LineWidth', .5, ...
+                      'LineStyle', '--',...
+                      'Color', 'g');
+              end
+          end
+      end
+      
+      function clearFits(cb)
+          if (~isempty(cb.fit_plot_handles))
+              delete(cb.fit_plot_handles);
+              cb.fit_plot_handles = [];
+          end
+      end
+      
+      function handles = plot_graph(cb, axisH, set, style, colorixd)
         % Given a tfTressSet set, create the subgraph associated with each
         % node and plot it.  Nodes attached to the same subset will only
         % be plotted once.  
@@ -208,7 +267,6 @@ classdef DebugRenderingManager < handle
         % subgraph that is plotted.
 
         import tonals.*;
-
         handles = [];
         piter = set.iterator();
 
@@ -230,6 +288,7 @@ classdef DebugRenderingManager < handle
                     seen{end+1} = p.find();
                     g = graph(p);
                     [newh, ~] = dtPlotGraph(g, ...
+                        'Axis', axisH,...
                         'ColorMap', cb.cmap, 'LineStyle', style, ...
                         'ColorIdx', colorixd, ...
                         'DistinguishEdges', false);

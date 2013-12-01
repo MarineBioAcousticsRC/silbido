@@ -326,7 +326,7 @@ public class ActiveSet {
 
 				if (inrange) {
 					// Determine time x freq trajectories into activenode
-					active_fits = fits(activenode, 0.025);
+					active_fits = getFitsForNode(activenode, 0.025);
 				} else {
 					active_fits = null;
 				}
@@ -553,7 +553,14 @@ public class ActiveSet {
 		}
 	}
 	
-	private LinkedList<FitPoly> fits(tfnode n, double back_s) {
+	public tfTreeSet getMergedFrontier() {
+		tfTreeSet merged = new tfTreeSet();
+		merged.addAll(this.activeSet);
+		merged.addAll(this.orphans);
+		return merged;
+	}
+	
+	public LinkedList<FitPoly> getFitsForNode(tfnode n, double back_s) {
 		LinkedList<FitPoly> list = new LinkedList<FitPoly>();
 
 		// TODO What is this hard coded number.

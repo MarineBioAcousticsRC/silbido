@@ -57,10 +57,10 @@ bright_dB = 10;
 contrast_Pct = 200;
 TransferFn = false;
 RemoveTransients = false;
+RemovalMethod = '';
 
 thr = dtParseParameterSet(varargin{:});  % retrieve parameters
 block_len_s = thr.blocklen_s;        % process how much at a time
-
 
 k = 1;
 while k <= length(varargin)
@@ -100,6 +100,8 @@ while k <= length(varargin)
             Render = varargin{k+1}; k=k+2;
         case 'RemoveTransients'
             RemoveTransients = varargin{k+1}; k=k+2;
+        case 'RemovalMethod'
+            RemovalMethod = varargin{k+1}; k=k+2;
         case 'Threshold'
             thr.whistle_dB = varargin{k+1}; k=k+2;
         case 'Click_dB'
@@ -213,6 +215,7 @@ while ~ done
         'Shift', shift_samples, ...
         'ClickP', [thr.broadband * range_binsN, thr.click_dB], ...
         'RemoveTransients', RemoveTransients, ...
+        'RemovalMethod', RemovalMethod, ...
         'Noise', NoiseComp);
 
     switch Render

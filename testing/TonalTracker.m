@@ -41,6 +41,8 @@ classdef TonalTracker < handle
         
         SPCallback;
         callbackSet;
+        
+        block_pad_s;
     end
     
     methods
@@ -209,12 +211,12 @@ classdef TonalTracker < handle
             tt.shift_samples = floor(tt.header.fs / tt.thr.high_cutoff_Hz);
             tt.shift_samples_s = tt.shift_samples / tt.header.fs; 
 
-            block_pad_s = 1 / tt.thr.high_cutoff_Hz;
-            tt.block_padded_s = block_len_s + 2 * block_pad_s;
-            tt.Stop_s = tt.Stop_s - block_pad_s;
+            tt.block_pad_s = 1 / tt.thr.high_cutoff_Hz;
+            tt.block_padded_s = block_len_s + 2 * tt.block_pad_s;
+            tt.Stop_s = tt.Stop_s - tt.block_pad_s;
 
-            if tt.Start_s - block_pad_s >= 0
-                tt.Start_s = tt.Start_s - block_pad_s;
+            if tt.Start_s - tt.block_pad_s >= 0
+                tt.Start_s = tt.Start_s - tt.block_pad_s;
             end
 
             % Keep track of how many peaks were detected in the previous frame
@@ -237,17 +239,27 @@ classdef TonalTracker < handle
             fprintf('Processing block from %.5f to %.5f\n', tt.StartBlock_s, tt.StopBlock_s);
             %extra = ((tt.Length_s / tt.Advance_s) + 1) * tt.Advance_s;
             %tt.StopBlock_s = min(tt.StopBlock_s + extra)
-            Signal = ioReadWav(tt.handle, tt.header, tt.StartBlock_s, tt.StopBlock_s, ...
-                'Units', 's', 'Channels', tt.channel);
+%             Signal = ioReadWav(tt.handle, tt.header, tt.StartBlock_s, tt.StopBlock_s, ...
+%                 'Units', 's', 'Channels', tt.channel);
 
             % Perform spectral analysis on block
-            [~, tt.snr_power_dB, tt.Indices, ~, ~] = dtSpecAnal(Signal, tt.header.fs, ...
-                tt.Length_samples, tt.Advance_samples, tt.shift_samples, ...
-                tt.range_bins, tt.thr.broadband * tt.range_binsN, ...
-                tt.thr.click_dB, tt.NoiseSub);
+%             [~, tt.snr_power_dB, tt.Indices, ~, ~] = dtSpecAnal(...
+%                 Signal, tt.header.fs, ...
+%                 tt.Length_samples, tt.Advance_samples, tt.shift_samples, ...
+%                 tt.range_bins, tt.thr.broadband * tt.range_binsN, ...
+%                 tt.thr.click_dB, tt.NoiseSub);
+            
+            [~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
+                tt.handle, tt.header, tt.channel, ...
+                tt.StartBlock_s, tt.block_padded_s, [tt.Length_samples, tt.Advance_samples], ...
+                'Pad', 0, 'Range', tt.range_bins, ...
+                'Shift', tt.shift_samples, ...
+                'ClickP', [tt.thr.broadband * tt.range_binsN, tt.thr.click_dB], ...
+                'RemoveTransients', false, ...
+                'Noise', {tt.NoiseSub});
 
             % relative to file rather than blockclear
-            tt.Indices.timeidx = tt.Indices.timeidx + tt.StartBlock_s;
+            %tt.Indices.timeidx = tt.Indices.timeidx + tt.StartBlock_s;
             
             % The first frame is 1, so we set this to zero, so we can call
             % advance, to get to the first frame.
@@ -258,6 +270,9 @@ classdef TonalTracker < handle
             end
         end
         
+        function weight = clickWieghts(x, m, sd, t, p)
+            weight = 1 / (1 + ((x - m)/t * sd)^p);
+        end
         
         function foundPeaks = selectPeaks(tt)
            foundPeaks = false;
@@ -329,7 +344,7 @@ classdef TonalTracker < handle
                % new peaks then add them to the active set.            
                tt.active_set.extend(peak_list, tt.thr.maxslope_Hz_per_ms, tt.thr.activeset_s);
                if (tt.callbackSet)
-                   tt.SPCallback.handleActiveSetExtension(tt.active_set);
+                   tt.SPCallback.handleActiveSetExtension(tt);
                end
             end
         end
@@ -338,7 +353,7 @@ classdef TonalTracker < handle
             tt.frame_idx = tt.frame_idx + 1;
             tt.current_s = tt.Indices.timeidx(tt.frame_idx);
             if (tt.callbackSet)
-               tt.SPCallback.frameAdvanced(tt.current_s);
+               tt.SPCallback.frameAdvanced(tt);
             end
         end
         
@@ -469,6 +484,10 @@ classdef TonalTracker < handle
         
         function end_time = getEndTime(tt)
             end_time = tt.Stop_s;
+        end
+        
+        function active_set = getActiveSet(tt)
+            active_set = tt.active_set;
         end
     end
 end

@@ -26,7 +26,7 @@ function varargout = dtTonalAnnotate(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 06-Oct-2013 14:11:15
+% Last Modified by GUIDE v2.5 29-Nov-2013 14:49:47
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -3048,3 +3048,20 @@ function quit_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 close();
+
+
+% --- Executes on button press in debugButton.
+function debugButton_Callback(hObject, eventdata, handles)
+% hObject    handle to debugButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+min_s = Inf;
+max_s = -Inf;
+for idx=1:length(handles.Selected)
+    t = get(handles.Selected(idx), 'XData');
+    min_s = min(min_s, min(t));
+    max_s = max(max_s, max(t));
+end
+data = get(handles.Annotation, 'UserData');
+
+TrackingDebugUI(data.Filename, 'ViewStart', min_s, 'ViewLength', max_s - min_s);
