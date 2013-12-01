@@ -10,7 +10,9 @@ classdef DebugRenderingManager < handle
       progress_handles;
       active_graph_handles;
       orphan_graph_handles;
+      breakpoint_handles;
       fit_plot_handles;
+      
       fit_plots_enabled;
       
       subgraphs_closed;
@@ -30,6 +32,7 @@ classdef DebugRenderingManager < handle
           cb.active_graph_handles = [];
           cb.orphan_graph_handles = [];
           cb.fit_plot_handles = [];
+          cb.breakpoint_handles = [];
           
           cb.subgraphs_closed = 0; 
           
@@ -37,7 +40,7 @@ classdef DebugRenderingManager < handle
           cb.fit_plots_enabled = false;
       end
       
-      function blockStarted(cb, spectrogram, start_s, end_s)
+      function blockStarted(cb, ~, start_s, end_s)
           set(cb.handles.blockStartTimeField, 'String', sprintf('%.5fs', start_s));
           set(cb.handles.blockEndTimeField, 'String', sprintf('%.5fs', end_s));
       end % process_block_begin
@@ -50,7 +53,7 @@ classdef DebugRenderingManager < handle
           
           if ~ isempty(cb.new_peak_handles)
               delete(cb.new_peak_handles);     % remove plots from last iteration
-              cb.new_peak_handles = {};
+              cb.new_peak_handles = [];
           end
           
           drawnow update;
@@ -106,6 +109,21 @@ classdef DebugRenderingManager < handle
                   [0,1], ...
                   'g-');
           drawnow update;
+      end
+      
+      function updateBreakpoints(cb, breakpoints)
+          if ~isempty(cb.breakpoint_handles)
+              delete(cb.breakpoint_handles);     
+              cb.breakpoint_handles = zeros(length(breakpoints));
+          end
+          
+          for idx = 1:length(breakpoints)
+              cb.breakpoint_handles(idx) = ...
+                  plot(cb.handles.progressAxes, ... 
+                      [breakpoints(idx) breakpoints(idx)], ...
+                      [0,1],...
+                      'm-');
+          end
       end
       
       function handleActiveSetExtension(cb, tt)
@@ -239,6 +257,7 @@ classdef DebugRenderingManager < handle
                       freqs(idx) = fit.predict(times(idx));
                   end
 
+                  % Plot the fit.
                   cb.fit_plot_handles(end+1) = plot(...
                       cb.handles.spectrogram, ...
                       times, ...
@@ -246,6 +265,34 @@ classdef DebugRenderingManager < handle
                       'LineWidth', .5, ...
                       'LineStyle', '--',...
                       'Color', 'g');
+                  
+                 
+                  % Plot the vertical line of the range.
+                  upper_limit = freqs(end) + tt.thr.maxslope_Hz_per_ms;
+                  lower_limit = max(0, freqs(end) - tt.thr.maxslope_Hz_per_ms);
+                  
+                  range_times = [tt.current_s tt.current_s];
+                  range_freqs = [lower_limit upper_limit];
+                  cb.fit_plot_handles(end+1) = plot(...
+                      cb.handles.spectrogram, ...
+                      range_times, ...
+                      range_freqs/1000, ...
+                      'LineWidth', .5, ...
+                      'LineStyle', '-',...
+                      'Color', 'g');
+                  
+                  cb.fit_plot_handles(end+1) = plot(...
+                      cb.handles.spectrogram, ...
+                      tt.current_s, ...
+                      upper_limit/1000, ...
+                      '+g');
+                  
+                  cb.fit_plot_handles(end+1) = plot(...
+                      cb.handles.spectrogram, ...
+                      tt.current_s, ...
+                      lower_limit/1000, ...
+                      '+g');
+                  
               end
           end
       end
@@ -255,6 +302,10 @@ classdef DebugRenderingManager < handle
               delete(cb.fit_plot_handles);
               cb.fit_plot_handles = [];
           end
+      end
+      
+      function setFitPlotsEnabled(cb, enabled)
+          cb.fit_plots_enabled = enabled;
       end
       
       function handles = plot_graph(cb, axisH, set, style, colorixd)

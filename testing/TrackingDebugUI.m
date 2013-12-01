@@ -7,7 +7,7 @@ function varargout = TrackingDebugUI(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 30-Nov-2013 16:50:19
+% Last Modified by GUIDE v2.5 30-Nov-2013 21:16:46
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -949,6 +949,7 @@ end
 
 set(handles.breakpointsList, 'String', breakpointsSeconds);
 data.breakpoints = breakpoints;
+data.debugRenderingManager.updateBreakpoints(breakpoints);
 SaveDataInFigure(handles, data);
 drawnow update;
 
@@ -1360,3 +1361,22 @@ function frameAdvanceField_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in showFitCheckBox.
+function showFitCheckBox_Callback(hObject, eventdata, handles)
+% hObject    handle to showFitCheckBox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of showFitCheckBox
+data = get(handles.TrackingDebug, 'UserData');
+
+checked = get(handles.showFitCheckBox, 'Value');
+data.debugRenderingManager.setFitPlotsEnabled(checked);
+if checked
+    data.debugRenderingManager.plotFits(data.tt);
+else
+    data.debugRenderingManager.clearFits();
+end
+SaveDataInFigure(handles, data);
