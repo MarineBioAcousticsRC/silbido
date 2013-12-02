@@ -24,7 +24,7 @@ for i = 1:size(test_files,1)
     input_file = test_files{i};
     fprintf('Tracking Tonals for file %s ...', input_file);
     
-    [detectedTonals, graphs] = dtTonalsTracking(input_file,0,Inf);
+    [detectedTonals, graphs] = dtTonalsTracking3(input_file,0,Inf);
     
     [path, name, ~] = fileparts(input_file);
     rel_path = path(size(base_dir,2)+1:end);
