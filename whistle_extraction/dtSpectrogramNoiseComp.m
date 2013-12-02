@@ -18,13 +18,24 @@ switch Method
     case 'median'
         power_dB = medfilt2(power_dB, region);
         % follow up by means subtraction
-        power_dB = dtSNR_meanssub(power_dB, useP);
+        
+%        [~,power_dB] = MallawaarachchiFilter(power_dB,1,1,4);
+        
+%         for idx = 1:length(power_dB)
+%             if(useP(idx) == 1);
+%                 frame = power_dB(:,idx);
+%                 m = mean(frame);
+%                 power_dB(:,idx) = frame - m;
+%             end
+%         end
+        
+        power_dB = dtSNR_meanssub(power_dB, useP); 
     
     case 'meansub'
         % Mean for specific time
         power_dB = dtSNR_meanssub(power_dB, useP);
     
-    case 'MA'
+    case 'ma'
         power_dB = medfilt2(power_dB, region);
         
         % moving average means subtraction
@@ -38,11 +49,10 @@ switch Method
         snr_power_dB = snr_power_dB';
         power_dB = power_dB - snr_power_dB;
         
-    case 'PSMF'
+    case 'psmf'
         % progressive switching median filter
         power_dB = PSMF(power_dB);
         power_dB = dtSNR_meanssub(power_dB, useP);
-        
         
     case 'kovesi'
         % Requires:
@@ -72,6 +82,18 @@ switch Method
             [noise_dB_T, noise_state] = estnoisem(power_dB', noise_state);
         end
         power_dB = power_dB - noise_dB_T';
+        
+    case 'rt'
+         
+        [power_dB,~] = CalculateFilter(power_dB, ...
+            10, ... %HPF
+            10, ... %LPF
+            1, ... %ISD
+            0, ... %ADAPTIVE
+            0,... %BANDPASS
+            1,... %CLICK
+            0); %MASK
+        power_dB = dtSNR_meanssub(power_dB, useP);
     otherwise
         error('unknown noise subtraction technique')
 end

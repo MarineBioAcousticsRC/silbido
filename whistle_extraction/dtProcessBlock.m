@@ -68,12 +68,12 @@ while vidx < length(varargin)
             range_bins = varargin{vidx+1}; vidx=vidx+2;
         case 'RemoveTransients'
             RemoveTransients = varargin{vidx+1}; vidx=vidx+2;
+        case 'RemovalMethod'
+            RemovalMethod = varargin{vidx+1}; vidx=vidx+2;
         case 'Shift'
             shift_samples = varargin{vidx+1}; vidx=vidx+2;
         case 'Noise'
             NoiseSub = varargin{vidx+1}; vidx=vidx+2;
-        case 'RemovalMethod'
-            RemovalMethod = varargin{vidx+1}; vidx=vidx+2;
         otherwise
             error('Bad optional argument');
     end

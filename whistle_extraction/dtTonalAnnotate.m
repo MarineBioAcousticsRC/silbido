@@ -26,7 +26,7 @@ function varargout = dtTonalAnnotate(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 29-Nov-2013 14:49:47
+% Last Modified by GUIDE v2.5 01-Dec-2013 15:41:45
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -3065,3 +3065,10 @@ end
 data = get(handles.Annotation, 'UserData');
 
 TrackingDebugUI(data.Filename, 'ViewStart', min_s, 'ViewLength', max_s - min_s);
+
+
+% --- Executes on button press in statsButton.
+function statsButton_Callback(hObject, eventdata, handles)
+% hObject    handle to statsButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)

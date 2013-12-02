@@ -1017,6 +1017,7 @@ tt = data.tt;
 set(handles.runButton,'Enable','off');
 set(handles.stopButton,'Enable','on');
 set(handles.stepButton,'Enable','off');
+set(handles.continueToPeakButton,'Enable','off');
 set(handles.resetButton,'Enable','off');
 set(handles.pauseButton,'Enable','on');
 set(handles.continueButton,'Enable','off');
@@ -1079,11 +1080,13 @@ if (~data.pauseRequested)
     set(handles.resetButton,'Enable','on');
     set(handles.stopButton,'Enable','off');
     set(handles.stepButton,'Enable','off');
+    set(handles.continueToPeakButton,'Enable','off');
     set(handles.pauseButton,'Enable','off');
 else
     set(handles.stepButton,'Enable','on');
     set(handles.pauseButton,'Enable','off');
     set(handles.continueButton,'Enable','on');
+    set(handles.continueToPeakButton,'Enable','on');
     set(handles.runButton,'Enable','off');
     set(handles.resetButton,'Enable','off');
     data.pauseRequested = false;
@@ -1099,6 +1102,7 @@ function stopButton_ClickedCallback(hObject, eventdata, handles)
 data = get(handles.TrackingDebug, 'UserData');
 data.stopRequested = true;
 set(handles.stepButton,'Enable','off');
+set(handles.continueToPeakButton,'Enable','off');
 set(handles.stopButton,'Enable','off');
 set(handles.runButton,'Enable','on');
 set(handles.resetButton,'Enable','on');
@@ -1208,6 +1212,7 @@ function pauseButton_ClickedCallback(hObject, eventdata, handles)
 data = get(handles.TrackingDebug, 'UserData');
 data.pauseRequested = true;
 set(handles.stepButton,'Enable','on');
+set(handles.continueToPeakButton,'Enable','on');
 set(handles.stopButton,'Enable','on');
 set(handles.runButton,'Enable','off');
 set(handles.resetButton,'Enable','off');
@@ -1335,8 +1340,6 @@ function frameLengthField_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-
 
 function frameAdvanceField_Callback(hObject, eventdata, handles)
 % hObject    handle to frameAdvanceField (see GCBO)

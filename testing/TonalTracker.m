@@ -43,6 +43,9 @@ classdef TonalTracker < handle
         callbackSet;
         
         block_pad_s;
+        
+        removeTransients;
+        removalMethod;
     end
     
     methods
@@ -132,9 +135,13 @@ classdef TonalTracker < handle
                             tt.thr.high_cutoff_Hz = varargin{k+1}(2);
                         end
                         k=k+2;
-                        case 'SPCallback'
-                            tt.SPCallback = varargin{k+1}; k=k+2;
-                            tt.callbackSet = true;
+                    case 'SPCallback'
+                        tt.SPCallback = varargin{k+1}; k=k+2;
+                        tt.callbackSet = true;
+                    case 'RemoveTransients'
+                        tt.removeTransients = varargin{k+1}; k=k+2;
+                    case 'RemovalMethod'
+                        tt.removalMethod = varargin{k+1}; k=k+2;
                     otherwise
                         try
                             if isnumeric(varargin{k})
@@ -234,20 +241,9 @@ classdef TonalTracker < handle
         end
         
         function startBlock(tt)
-             % Retrieve the data for this block
+            % Retrieve the data for this block
             tt.StopBlock_s = min(tt.StartBlock_s + tt.block_padded_s, tt.Stop_s);
             fprintf('Processing block from %.5f to %.5f\n', tt.StartBlock_s, tt.StopBlock_s);
-            %extra = ((tt.Length_s / tt.Advance_s) + 1) * tt.Advance_s;
-            %tt.StopBlock_s = min(tt.StopBlock_s + extra)
-%             Signal = ioReadWav(tt.handle, tt.header, tt.StartBlock_s, tt.StopBlock_s, ...
-%                 'Units', 's', 'Channels', tt.channel);
-
-            % Perform spectral analysis on block
-%             [~, tt.snr_power_dB, tt.Indices, ~, ~] = dtSpecAnal(...
-%                 Signal, tt.header.fs, ...
-%                 tt.Length_samples, tt.Advance_samples, tt.shift_samples, ...
-%                 tt.range_bins, tt.thr.broadband * tt.range_binsN, ...
-%                 tt.thr.click_dB, tt.NoiseSub);
             
             [~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
                 tt.handle, tt.header, tt.channel, ...
@@ -255,12 +251,10 @@ classdef TonalTracker < handle
                 'Pad', 0, 'Range', tt.range_bins, ...
                 'Shift', tt.shift_samples, ...
                 'ClickP', [tt.thr.broadband * tt.range_binsN, tt.thr.click_dB], ...
-                'RemoveTransients', false, ...
+                'RemoveTransients', tt.removeTransients, ...
+                'RemovalMethod', tt.removalMethod, ...
                 'Noise', {tt.NoiseSub});
 
-            % relative to file rather than blockclear
-            %tt.Indices.timeidx = tt.Indices.timeidx + tt.StartBlock_s;
-            
             % The first frame is 1, so we set this to zero, so we can call
             % advance, to get to the first frame.
             tt.frame_idx = 0;
@@ -268,10 +262,6 @@ classdef TonalTracker < handle
             if (tt.callbackSet)
                tt.SPCallback.blockStarted(tt.snr_power_dB,tt.StartBlock_s,tt.StopBlock_s);
             end
-        end
-        
-        function weight = clickWieghts(x, m, sd, t, p)
-            weight = 1 / (1 + ((x - m)/t * sd)^p);
         end
         
         function foundPeaks = selectPeaks(tt)
