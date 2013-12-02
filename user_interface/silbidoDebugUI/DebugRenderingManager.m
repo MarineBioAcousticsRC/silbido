@@ -12,12 +12,14 @@ classdef DebugRenderingManager < handle
       orphan_graph_handles;
       breakpoint_handles;
       fit_plot_handles;
+      graph_handles;
       
       fit_plots_enabled;
       
       subgraphs_closed;
-      
-      cmap;      
+
+      graph_cmap;
+      graph_cmap_idx;
    end % properties
    
    methods
@@ -33,11 +35,16 @@ classdef DebugRenderingManager < handle
           cb.orphan_graph_handles = [];
           cb.fit_plot_handles = [];
           cb.breakpoint_handles = [];
+          cb.graph_handles = [];
           
           cb.subgraphs_closed = 0; 
+
+          cb.graph_cmap = hsv(20);
+          cb.graph_cmap = cb.graph_cmap(randperm(20), :);
           
-          cb.cmap = [[0 1 1];[1 0 1]];
           cb.fit_plots_enabled = false;
+          cb.graph_cmap_idx = 1;
+          
       end
       
       function blockStarted(cb, ~, start_s, end_s)
@@ -151,7 +158,7 @@ classdef DebugRenderingManager < handle
           cb.active_graph_handles = cb.plot_graph(...
               cb.handles.spectrogram, ...
               active_set.getActiveSet(), ...
-              '-',2);
+              '-','m');
            
             % Plot the peaks that are currently in the active set.
           cb.active_set_peak_handles = plot(...
@@ -163,7 +170,7 @@ classdef DebugRenderingManager < handle
           cb.orphan_graph_handles = cb.plot_graph(...
               cb.handles.spectrogram, ...
               active_set.getOrphanSet(), ...
-              '-',1);
+              '-','c');
            
           % Plot the peaks that are currently in the orphan set.
           cb.orphan_set_peak_handles = plot(...
@@ -181,10 +188,12 @@ classdef DebugRenderingManager < handle
               % planning on deleting them (yet at least)
               for k = prev_closed:(cb.subgraphs_closed-1)
                   g = active_set.getResultGraphs().get(k);
-                  dtPlotGraph(g, ...
-                      'ColorMap', cb.cmap, 'LineStyle', '-', ...
-                      'ColorIdx', 1, 'Marker', '.', ...
-                      'DistinguishEdges', false);
+                  [newh, cb.graph_cmap_idx] = dtPlotGraph(g, ...
+                      'ColorMap', cb.graph_cmap, 'LineStyle', '--', ...
+                      'ColorIdx', cb.graph_cmap_idx, 'Marker', '.', ...
+                      'DistinguishEdges', true);
+                  
+                  cb.graph_handles = [cb.graph_handles, newh{:}];
               end
           end
            
@@ -205,6 +214,11 @@ classdef DebugRenderingManager < handle
           if (~isempty(cb.new_peak_handles))
               delete(cb.new_peak_handles);     % remove plots from last iteration
               cb.new_peak_handles = {};
+          end
+          
+          if (~isempty(cb.graph_handles))
+              delete(cb.graph_handles);     % remove plots from last iteration
+              cb.graph_handles = {};
           end
           
           if (~isempty(cb.progress_handles))
@@ -308,7 +322,7 @@ classdef DebugRenderingManager < handle
           cb.fit_plots_enabled = enabled;
       end
       
-      function handles = plot_graph(cb, axisH, set, style, colorixd)
+      function handles = plot_graph(cb, axisH, set, style, color)
         % Given a tfTressSet set, create the subgraph associated with each
         % node and plot it.  Nodes attached to the same subset will only
         % be plotted once.  
@@ -316,11 +330,11 @@ classdef DebugRenderingManager < handle
         % coloridx is incremented modulo the # of entries in the colormap
         % and returned on exit along with a cell array of handles for each
         % subgraph that is plotted.
-
+        
         import tonals.*;
         handles = [];
         piter = set.iterator();
-
+        
         seen = [];
         while piter.hasNext();
             p = piter.next();
@@ -340,8 +354,7 @@ classdef DebugRenderingManager < handle
                     g = graph(p);
                     [newh, ~] = dtPlotGraph(g, ...
                         'Axis', axisH,...
-                        'ColorMap', cb.cmap, 'LineStyle', style, ...
-                        'ColorIdx', colorixd, ...
+                        'Color', color, 'LineStyle', style, ...
                         'DistinguishEdges', false);
   
                     handles = [handles, newh{:}];

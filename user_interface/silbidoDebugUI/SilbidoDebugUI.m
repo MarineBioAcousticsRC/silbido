@@ -7,7 +7,7 @@ function varargout = SilbidoDebugUI(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 01-Dec-2013 17:15:19
+% Last Modified by GUIDE v2.5 01-Dec-2013 20:24:13
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -148,6 +148,7 @@ data.debugRenderingManager = DebugRenderingManager(handles, data.thr);
 data.stopRequested = false;
 data.pauseRequested = false;
 data.atBreakPoint = false;
+data.pauseAtNextPeak = false;
 hold(handles.progressAxes, 'on');
 
 data.Start_s = start_in_range(viewStartSeconds, handles, data);
@@ -1046,8 +1047,9 @@ while (~data.stopRequested && ~data.pauseRequested)
     if (data.stepAction == 0)
         found = tt.selectPeaks();
         if (found)
-            if (break_on_peaks)
+            if (break_on_peaks || data.pauseAtNextPeak)
                 data.pauseRequested = true;
+                data.pauseAtNextPeak = false;
                 data.stepAction = 1;
                 data.debugRenderingManager.plotFits(tt);
                 break;
@@ -1120,10 +1122,10 @@ data = get(handles.TrackingDebug, 'UserData');
 tt = data.tt;
 data.debugRenderingManager.clearFits();
 peaks_only = get(handles.peaksOnlyCheckBox, 'Value');
-stepMode = 0;
+stepMode = get(handles.stepModeMenu, 'Value');
 if (tt.hasMoreFrames())
     switch stepMode
-        case 0
+        case 1
             if (data.stepAction == 0)
                 tt.selectPeaks();
                 if (~peaks_only)
@@ -1137,6 +1139,12 @@ if (tt.hasMoreFrames())
             end
             
             data.stepAction = mod(data.stepAction + 1, 2);
+        case 2
+            tt.selectPeaks();
+            if (~isempty(tt.getCurrentFramePeakFreqs()))
+                tt.pruneAndExtend();
+            end
+            tt.advanceFrame();
     end
 end
 if (~tt.hasMoreFrames())
@@ -1383,3 +1391,14 @@ else
     data.debugRenderingManager.clearFits();
 end
 SaveDataInFigure(handles, data);
+
+
+% --------------------------------------------------------------------
+function continueToPeakButton_ClickedCallback(hObject, eventdata, handles)
+% hObject    handle to continueToPeakButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+data = get(handles.TrackingDebug, 'UserData');
+data.pauseAtNextPeak = true;
+SaveDataInFigure(handles, data);
+execute(handles);

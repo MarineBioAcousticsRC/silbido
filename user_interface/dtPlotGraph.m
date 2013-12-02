@@ -47,15 +47,17 @@ function [handles, cidx]= dtPlotGraph(tonal_collection, varargin)
         
         time = tonal.get_time();
         freq = tonal.get_freq() / scale;
+        if isempty(Color)
+            Color = ColorMap(cidx, :);
+        end
+        
         switch PlotType
             case 'edge'
                 handles{hidx} = plot(AxisH, time, freq, ...
                     'LineStyle', LineStyle, 'Marker', Marker, ...
-                    'Color', ColorMap(cidx, :), ...
+                    'Color', Color, ...
                     'LineWidth', LineWidth);
-                
-                
-                
+
                 if Distinct
                     % Change color for the next edge
                     cidx = mod(cidx, colorN) + 1;
@@ -80,6 +82,7 @@ function [handles, cidx]= dtPlotGraph(tonal_collection, varargin)
 
 % Defaults
 ColorMap = get(gcf, 'ColorMap');
+Color = '';
 cidx = 1;
 Distinct = false;
 scale = 1000; % kHz
@@ -101,6 +104,8 @@ while k <= length(varargin)
             AxisH = varargin{k+1}; k=k+2;
         case 'EdgeCallback'
             EdgeCallback = varargin{k+1}; k=k+2;
+        case 'Color'
+            Color = varargin{k+1}; k=k+2;
         case 'ColorMap'
             ColorMap = varargin{k+1}; k=k+2;
         case 'ColorIdx'

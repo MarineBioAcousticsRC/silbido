@@ -3064,7 +3064,7 @@ for idx=1:length(handles.Selected)
 end
 data = get(handles.Annotation, 'UserData');
 
-TrackingDebugUI(data.Filename, 'ViewStart', min_s, 'ViewLength', max_s - min_s);
+SilbidoDebugUI(data.Filename, 'ViewStart', min_s, 'ViewLength', max_s - min_s);
 
 
 % --- Executes on button press in statsButton.
