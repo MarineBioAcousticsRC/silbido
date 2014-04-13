@@ -1104,6 +1104,7 @@ function stopButton_ClickedCallback(hObject, eventdata, handles)
 data = get(handles.TrackingDebug, 'UserData');
 data.stopRequested = true;
 set(handles.stepButton,'Enable','off');
+set(handles.stepButton,'Enable','off');
 set(handles.continueToPeakButton,'Enable','off');
 set(handles.stopButton,'Enable','off');
 set(handles.runButton,'Enable','on');

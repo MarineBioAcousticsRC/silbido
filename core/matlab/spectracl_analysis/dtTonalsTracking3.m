@@ -1,4 +1,4 @@
-function [tonals, subgraphs] = dtTonalsTracking2(Filename, Start_s, Stop_s, varargin)
+function [tonals, subgraphs] = dtTonalsTracking3(Filename, Start_s, Stop_s, varargin)
 % [tonals, subgraphs] = dtTonalsTracking(Filename, OptionalArgs)
 % Filename - Cell array of filenames that are assumed to be consecutive
 %            Example -  {'palmyra092007FS192-071011-230000.wav', 

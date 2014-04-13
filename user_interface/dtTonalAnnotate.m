@@ -2788,28 +2788,30 @@ allTonals = get(handles.allTonalsRadio,'Value');
 
 switch(comboValue)
     
-    case 1
+    case 1 % All detections
         fileName = data.resultAnnotations.det;
         
-    case 2
+    case 2 % Good Detections
         if (allTonals > 0)
             fileName = data.resultAnnotations.a_d_plus;
         else
             fileName = data.resultAnnotations.s_d_plus;
         end
-    case 3
+        
+    case 3 % False Positives
         fileName = data.resultAnnotations.d_minus;
         
-    case 4
+    case 4 % All Ground Truth
         fileName = data.resultAnnotations.bin;
         
-    case 5
+    case 5 % Detected Ground Truth
         if (allTonals > 0)
             fileName = data.resultAnnotations.a_gt_plus;
         else
             fileName = data.resultAnnotations.s_gt_plus;
         end
-    case 6
+        
+    case 6 % Missed Ground Truth
         if (allTonals > 0)
             fileName = data.resultAnnotations.a_gt_minus;
         else
