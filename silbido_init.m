@@ -8,14 +8,10 @@ warning off % this is turned off for plotting messages
 
 % Add subdirectories to search path
 RootDir = pwd();
-paths = genpath2('core/matlab', 'ExcludeDirs', {'java','.hg', '.hgcheck', 'eclipse'}, 'ExcludeRootDir', 1);
+
+paths = genpath2('matlab');
 addpath(paths);
 
-paths = genpath2('user_interface');
-addpath(paths);
-
-paths = genpath2('testing');
-addpath(paths);
 
 paths = genpath2('sandbox');
 addpath(paths);
@@ -23,7 +19,7 @@ addpath(paths);
 % Set up java.
 import tonals.*;
 
-java_base_dir = 'core/java/';
+java_base_dir = 'java/';
 
 % First try to load it from where eclipse compiles code.
 java_bin_dir = fullfile(RootDir, [java_base_dir 'bin']);

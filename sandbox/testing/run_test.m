@@ -8,8 +8,8 @@ import tonals.*;
 
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/filter_test/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
-base_dir = '/Users/michael/development/sdsu/silbido/corpora/trouble/';
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/trouble/';
+base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short_beaked/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short-test/';
 output_dir = 'testing/results/';

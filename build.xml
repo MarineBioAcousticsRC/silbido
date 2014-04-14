@@ -1,32 +1,68 @@
-<project name="silbido" default="build" basedir=".">
+<project name="silbido" default="dist" basedir=".">
     <description>
-        simple example build file
+        This and script will build the silbido release files.
     </description>
 
   <!-- set global properties for this build -->
+  <property name="silbido-version" value="0.2-beta"/>
   <property name="build" location="build"/>
+  <property name="build.package"  location="${build}/packjage"/>
+  <property name="build.package.java"  location="${build}/packjage/java"/>
+  <property name="build.package.matlab"  location="${build}/packjage/java"/>
+  <property name="build.jar"  location="${build}/jar"/>
+  <property name="build.jar.name"  value="${build.jar}/silbido-classes-${silbido-version}.jar"/>
   <property name="dist"  location="dist"/>
+  <property name="java.src"  location="core/java/src"/>
+  <property name="java.build"  location="${build}/java"/>
+  <property name="java.build.classes"  location="${build}/java"/>
+  <property name="java.lib"  location="core/java/lib"/>
+  
 
-  <target name="init">
+  <path id="silbido-classpath">
+    <fileset dir="${java.lib}">
+      <include name="*.jar"/>
+    </fileset>
+  </path>
+  
+  <target name="buildInit">
     <!-- Create the time stamp -->
     <tstamp/>
     <!-- Create the build directory structure used by compile -->
-    <mkdir dir="${build}"/>
-  </target>
-
-  <target name="build" depends="buildJar"
-        description="compile the source " >
-    <!-- Compile the java code from ${src} into ${build} -->
+    
   </target>
   
-  <target name="buildJar" depends="init">
-     <ant antfile="build.xml" dir="whistle" inheritAll="false"/>
+  <target name="buildJar" depends="compile" description="compile the source " >
+    <jar destfile="${build.jar.name}"
+         basedir="${java.build.classes}"
+         includes="**/*.class"
+    />
+  </target>
+  
+  <target name="compile" depends="">
+    <mkdir dir="${build}"/>
+    <mkdir dir="${build.jar}"/>
+    <mkdir dir="${java.build}"/>
+    <mkdir dir="${java.build.classes}"/>
+    
+    <javac srcdir="${java.src}" destdir="${java.build.classes}"  target="1.6" source="1.6">
+      <classpath refid="silbido-classpath"/>
+    </javac>
   </target>
 
-  <target name="dist" depends="build"
-        description="generate the distribution" >
-    <!-- Create the distribution directory -->
-
+  <target name="dist" depends="buildJar" description="generate the distribution" >
+    <mkdir dir="${build.package}"/>
+    <mkdir dir="${build.package.lib}"/>
+    
+    <copy todir="${build.package.lib}">
+      <fileset dir="${java.lib}">
+        <include name="**/*.jar"/>
+        <exclude name="**/*-sources.jar"/>
+      </fileset>
+      <fileset dir="${build.jar}">
+        <include name="**/*.jar"/>
+      </fileset>
+    </copy>
+  
   </target>
 
   <target name="clean"
