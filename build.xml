@@ -8,52 +8,49 @@
   <property name="build" location="build"/>
   <property name="build.package"  location="${build}/packjage"/>
   <property name="build.package.java"  location="${build}/packjage/java"/>
-  <property name="build.package.matlab"  location="${build}/packjage/java"/>
+  <property name="build.package.matlab"  location="${build}/packjage/matlab"/>
+  <property name="build.package.docs"  location="${build}/packjage/docs"/>
   <property name="build.jar"  location="${build}/jar"/>
   <property name="build.jar.name"  value="${build.jar}/silbido-classes-${silbido-version}.jar"/>
   <property name="dist"  location="dist"/>
-  <property name="java.src"  location="core/java/src"/>
+  <property name="java.src"  location="src/java/src"/>
   <property name="java.build"  location="${build}/java"/>
   <property name="java.build.classes"  location="${build}/java"/>
-  <property name="java.lib"  location="core/java/lib"/>
+  <property name="java.lib"  location="src/java/lib"/>
+  <property name="matlab.src"  location="src/matlab"/>
   
-
+  <!-- The class path used for compilation -->
   <path id="silbido-classpath">
     <fileset dir="${java.lib}">
       <include name="*.jar"/>
     </fileset>
   </path>
   
-  <target name="buildInit">
-    <!-- Create the time stamp -->
-    <tstamp/>
-    <!-- Create the build directory structure used by compile -->
-    
-  </target>
-  
-  <target name="buildJar" depends="compile" description="compile the source " >
+  <target name="buildJar" depends="compile" description="Builds the silbido jar file." >
     <jar destfile="${build.jar.name}"
          basedir="${java.build.classes}"
          includes="**/*.class"
     />
   </target>
   
-  <target name="compile" depends="">
+  <target name="compile" depends="Compiles the silbido java classes.">
     <mkdir dir="${build}"/>
     <mkdir dir="${build.jar}"/>
     <mkdir dir="${java.build}"/>
     <mkdir dir="${java.build.classes}"/>
     
-    <javac srcdir="${java.src}" destdir="${java.build.classes}"  target="1.6" source="1.6">
+    <javac srcdir="${java.src}" destdir="${java.build.classes}" includeantruntime="false" target="1.6" source="1.6">
       <classpath refid="silbido-classpath"/>
     </javac>
   </target>
 
-  <target name="dist" depends="buildJar" description="generate the distribution" >
+  <target name="package" depends="buildJar" description="Creates the package to be zipped." >
     <mkdir dir="${build.package}"/>
-    <mkdir dir="${build.package.lib}"/>
+    <mkdir dir="${build.package.java}"/>
+    <mkdir dir="${build.package.matlab}"/>
+    <mkdir dir="${build.package.docs}"/>
     
-    <copy todir="${build.package.lib}">
+    <copy todir="${build.package.java}">
       <fileset dir="${java.lib}">
         <include name="**/*.jar"/>
         <exclude name="**/*-sources.jar"/>
@@ -62,12 +59,33 @@
         <include name="**/*.jar"/>
       </fileset>
     </copy>
+ 
+    <copy todir="${build.package.matlab}">
+      <fileset dir="${matlab.src}">
+        <include name="**/*"/>
+      </fileset>
+    </copy>
+    
+    <copy todir="${build.package}">
+      <fileset dir="${basedir}">
+        <include name="silbido_init.m"/>
+      </fileset>
+    </copy>
+    
+    <copy todir="${build.package.docs}">
+      <fileset dir="${basedir}/docs">
+        <include name="**/*"/>
+      </fileset>
+    </copy>
+  </target>
   
+  <target name="dist" depends="package" description="Generates the distribution" >
+    <mkdir dir="${dist}"/>
+    <zip destfile="${dist}/silbido-${silbido-version}.zip" basedir="${build.package}" />
+    <tar destfile="${dist}/silbido-${silbido-version}.tgz" basedir="${build.package}" compression="gzip" />
   </target>
 
-  <target name="clean"
-        description="clean up" >
-    <!-- Delete the ${build} and ${dist} directory trees -->
+  <target name="clean" description="clean up" >  
     <delete dir="${build}"/>
     <delete dir="${dist}"/>
   </target>

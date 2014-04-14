@@ -9,46 +9,42 @@ warning off % this is turned off for plotting messages
 % Add subdirectories to search path
 RootDir = pwd();
 
-paths = genpath2('matlab');
-addpath(paths);
+if (exist('src/matlab', 'dir'))
+    % Handle the development structure
+    paths = genpath2('src/matlab');
+    addpath(paths);
 
+    paths = genpath2('src/sandbox');
+    addpath(paths);
 
-paths = genpath2('sandbox');
-addpath(paths);
+    java_base_dir = 'src/java/';
 
-% Set up java.
-import tonals.*;
+    java_bin_dir = fullfile(RootDir, [java_base_dir 'bin']);
+    javaaddpath(java_bin_dir);
+    
+    % Ensure we found the java classes.
+    import tonals.*;
 
-java_base_dir = 'java/';
-
-% First try to load it from where eclipse compiles code.
-java_bin_dir = fullfile(RootDir, [java_base_dir 'bin']);
-javaaddpath(java_bin_dir);
-
-% If we didn't find it check in the ant build dir.
-if (~exist('tonals.tonal')) 
-    java_build_dir = fullfile(RootDir, [java_base_dir 'build']);
-    javaaddpath(java_build_dir);
-end
-
-% If we still didn't find it try to load the distribution
-% jar file.
-if (~exist('tonals.tonal')) 
-    java_dist_dir = fullfile(RootDir, [java_base_dir 'dist']);
+    if (~exist('tonals.tonal')) 
+        error('Could not load java classes.  Please ensure they have been compiled into the src/java/bin directory with a java 1.6 compile target.');
+    end
+else
+    % Handle the distribution structure
+    paths = genpath2('matlab');
+    addpath(paths);
+    
+    java_dist_dir = fullfile(RootDir, 'java');
     java_archives = utFindFiles({'*.jar'}, {java_dist_dir}, 1);
     if ~ isempty(java_archives);
         javaaddpath(java_archives);
     end
-end
+    
+     % Ensure we found the java classes.
+    import tonals.*;
 
-java_dist_dir = fullfile(RootDir, [java_base_dir 'lib']);
-java_archives = utFindFiles({'*.jar'}, {java_dist_dir}, 1);
-if ~ isempty(java_archives);
-    javaaddpath(java_archives);
-end
-
-if (~exist('tonals.tonal')) 
-    error('Could not load java classes.');
+    if (~exist('tonals.tonal')) 
+        error('Could not load java classes.  Please ensure they have been compiled into the src/java/bin directory with a java 1.6 compile target.');
+    end
 end
 
 
