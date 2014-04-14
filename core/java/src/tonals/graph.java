@@ -42,19 +42,6 @@ public class graph implements Serializable {
 	public double resolutionHz;
 	public final double graphId;
 	
-	
-	/*
-	 * Create a graph.
-	 * The first node given must be at one of the the following:
-	 * entry point - no predecessors
-	 * exit point - no successors
-	 * junction - 2 or more entries on the successor list,
-	 * 			the predecessor list, or both.
-	 */
-	public graph(tfnode n) {
-		this(n, -1);
-	}
-	
 	/*
 	 * Create a graph.
 	 * The first node given must be at one of the the following:
@@ -440,6 +427,7 @@ public class graph implements Serializable {
 						tonal in_edge = in.content;
 						
 						// Error calculation
+						double fit_err_dphase = fit(in_edge, out_edge, disamb_thr_s, true);
 						double fit_err_slp = fit(in_edge, out_edge, disamb_thr_s, false);
 						
 						
@@ -452,7 +440,7 @@ public class graph implements Serializable {
 						scores.add(new fitness<edgepair>(
 								new edgepair(in, out), 
 								fit_err_slp,
-								0
+								0//fit_err_dphase
 						));
 						
 						// The fitness value of the to and from nodes
@@ -654,18 +642,18 @@ public class graph implements Serializable {
 		// outgoing tonal skip first N nodes.
 		int skip_n = 2;
 		
-		FitPoly in_fit = fit(in_edge, skip_n, true);
-		FitPoly out_fit = fit(out_edge, skip_n, false);
+		FitPoly in_fit = fit(in_edge, skip_n, fit_dphase, true);
+		FitPoly out_fit = fit(out_edge, skip_n, fit_dphase, false);
 		
-		err_out = get_err(in_fit, out_edge, disamb_thr_s, skip_n)
+		err_out = get_err(in_fit, out_edge, disamb_thr_s, skip_n, fit_dphase)
 				  / out_edge.duration();
-		err_in = get_err(out_fit, in_edge, -disamb_thr_s, skip_n)
+		err_in = get_err(out_fit, in_edge, -disamb_thr_s, skip_n, fit_dphase)
 				  / in_edge.duration();
 		return err_in + err_out;
 	}
 	
 	private double get_err(FitPoly fit, tonal path, double how_far_s,
-			int skip_n) {
+			int skip_n, boolean fit_dphase) {
 		
 		boolean incoming_edge;
 		Iterator<tfnode> it;
@@ -685,49 +673,223 @@ public class graph implements Serializable {
 		double error = 0.0;
 		double cum_error = 0.0;
 		
-		
-		error = fit.getSquaredErrorForPoint(node.time, node.freq);
-		cum_error = error;
-		int count = 1;
-		// iterate through list accumulating error until done
-		while (it.hasNext() & elapsed_s < how_far_s) {
-			node = it.next();
-			elapsed_s = Math.abs(start_s - node.time);
+		if (fit_dphase) {
+			int n = path.size();
+			double freq = 0.0;
+			double diff = 0.0;
+			tfnode prev = null;
+			int count = 0;
+			
+			if (n <= skip_n + 1) {
+				// Tonal not having enough node to skip.
+				// First difference of phase is calculated without 
+				// skipping the nodes. 
+				
+				// iterate through list accumulating error until done
+				while (it.hasNext() & elapsed_s < how_far_s) {
+					prev = node;
+					node =  it.next();
+					elapsed_s = Math.abs(start_s - node.time);
+					if (incoming_edge)
+						freq = prev.freq;
+					else
+						freq = node.freq;
+					
+					// first phase difference
+					if (Math.signum(node.phase) == Math.signum(prev.phase))
+						diff = Math.abs(node.phase - prev.phase);
+					else {
+						if (node.phase < 0.0)
+							diff = Math.abs(node.phase) + prev.phase;
+						else
+							diff = Math.abs(prev.phase) + node.phase;
+					}
+					error = fit.getSquaredErrorForPoint(freq, diff);
+					cum_error += error;
+					count++;
+				}
+				return cum_error / count;
+			} else {
+				while (skip_n != 0) {
+					// skip N nodes
+					node = it.next();
+					skip_n--;
+					start_s = node.time;
+				}
+				// iterate through list accumulating error until done
+				while (it.hasNext() & elapsed_s < how_far_s) {
+					// First difference of phase is calculated after
+					// skipping the nodes.
+					prev = node;
+					node =  it.next();
+					elapsed_s = Math.abs(start_s - node.time);
+					if (incoming_edge)
+						freq = prev.freq;
+					else
+						freq = node.freq;
+					
+					// first phase difference
+					if (Math.signum(node.phase) == Math.signum(prev.phase))
+						diff = Math.abs(node.phase - prev.phase);
+					else {
+						if (node.phase < 0.0)
+							diff = Math.abs(node.phase) + prev.phase;
+						else
+							diff = Math.abs(prev.phase) + node.phase;
+					}
+					error = fit.getSquaredErrorForPoint(freq, diff);
+					cum_error += error;
+					count++;
+				}
+				return cum_error / count;
+			}
+		} else {
 			error = fit.getSquaredErrorForPoint(node.time, node.freq);
-			cum_error += error;
-			count++;
+			cum_error = error;
+			int count = 1;
+			// iterate through list accumulating error until done
+			while (it.hasNext() & elapsed_s < how_far_s) {
+				node = it.next();
+				elapsed_s = Math.abs(start_s - node.time);
+				error = fit.getSquaredErrorForPoint(node.time, node.freq);
+				cum_error += error;
+				count++;
+			}
+			return cum_error / count;
 		}
-		return cum_error / count;
 	}
 	
-	private FitPoly fit(tonal path, int skip_n, boolean incoming_edge) {
+	private FitPoly fit(tonal path, int skip_n, boolean fit_dphase, boolean incoming_edge) {
 		
 		final double 	 fit_thresh = .7;
 
-		int order = path.size() > 6?2:1;
+		int order = 1;
 		// far enough back, fit the polynomial
-		FitPoly fit = new FitPolyJama(order, path, skip_n, incoming_edge);
-
+		FitPoly fit = null;
+		if (fit_dphase) {
+			fit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+		} else {
+			fit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+		}
+		
+		order = order + 1;
 		// If the bit is bad, try the next order up.  
 		// When the frequencies have a standard deviation
 		// that is somewhere near our quantization noise or
 		// if there are not enough points to get a good
 		// higher order fit, we live with the fit we have.
-		while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && path.size() > order*3) {
-			order++;
+		while (fit.getR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && path.size() > order*3) {
+//		while (fit.getAdjustedR2() < fit_thresh && path.size() > order*3) {
+			// lousy fit, try again
+//			order = order + 1;
 			FitPoly newFit;
 			
-			newFit = new FitPolyJama(order, path, skip_n, incoming_edge);
+			if (fit_dphase) {
+				newFit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+			} else {
+				newFit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+			}
 			
 			if(newFit.getAdjustedR2() > fit.getAdjustedR2()){
 				fit = newFit;
 			}
+			
+			order = order + 1;
 		}
-		
 		return fit;
 	}
 
+	private double fit_phase_vec (tonal in_edge, tonal out_edge, double disamb_thr_s) {
+		double in_vec_str = vector_str(in_edge, -disamb_thr_s);
+		double out_vec_str = vector_str(out_edge, disamb_thr_s);
+		return Math.abs(in_vec_str - out_vec_str);
+	}
 	
+	private double vector_str(tonal path, double how_far_s) {
+	
+		Iterator<tfnode> it;
+		
+		if (how_far_s >= 0) {
+			it = path.iterator();  // forward direction
+		} else {
+			it = path.descendingIterator();   // backward direction
+			how_far_s = -how_far_s;
+		}
+
+		// Skip N nodes of the tonal.
+		// Reason being that the phase at the the junction node and
+		// nearby nodes are influenced by the phase of each other due to closeness.
+		// Phase of these nodes does not represent correct phase information.
+		//
+		// In case of:
+		// incoming tonal skip last N nodes;
+		// outgoing tonal skip first N nodes.
+		int skip_n = 2;
+		
+		int n = path.size();
+		double elapsed_s = 0.0;
+		tfnode node = it.next();	
+		double start_s = node.time;
+		tfnode prev = null;
+		
+		double diff = 0.0;
+		double S = 0; // sin value
+		double C = 0; // cos value
+		int count = 0;
+		
+		if (n <= skip_n + 1) {
+			// Tonal not having enough node to skip.
+			// First difference of phase is calculated without 
+			// skipping the nodes.
+			
+			while (it.hasNext() & elapsed_s < how_far_s) {
+				prev = node;
+				node =  it.next();
+				elapsed_s = Math.abs(start_s - node.time);
+				// first phase difference
+				if (Math.signum(node.phase) == Math.signum(prev.phase))
+					diff = Math.abs(node.phase - prev.phase);
+				else {
+					if (node.phase < 0.0)
+						diff = Math.abs(node.phase) + prev.phase;
+					else
+						diff = Math.abs(prev.phase) + node.phase;
+				}
+				S = S + Math.sin(diff);
+				C = C + Math.cos(diff);
+				count++;
+			}
+			return (Math.sqrt(S*S + C*C) / count); // Vector strength
+		} else {
+			while (skip_n != 0) {
+				// skip N nodes
+				node = it.next();
+				skip_n--;
+				start_s = node.time;
+			}
+			while (it.hasNext() & elapsed_s < how_far_s) {
+				// First difference of phase is calculated after 
+				// skipping the nodes.
+				prev = node;
+				node =  it.next();
+				elapsed_s = Math.abs(start_s - node.time);
+				// first phase difference
+				if (Math.signum(node.phase) == Math.signum(prev.phase))
+					diff = Math.abs(node.phase - prev.phase);
+				else {
+					if (node.phase < 0.0)
+						diff = Math.abs(node.phase) + prev.phase;
+					else
+						diff = Math.abs(prev.phase) + node.phase;
+				}
+				S = S + Math.sin(diff);
+				C = C + Math.cos(diff);
+				count++;
+			}
+			return (Math.sqrt(S*S + C*C) / count); // Vector strength
+		}
+	}
+
 	/*
 	 * viable_pair
 	 * Given a pair of edges, check and see if they still exist
