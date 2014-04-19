@@ -4,7 +4,7 @@
     </description>
 
   <!-- set global properties for this build -->
-  <property name="silbido-version" value="0.5-beta"/>
+  <property name="silbido-suffix" value="-beta"/>
   <property name="build" location="build"/>
   <property name="build.package"  location="${build}/packjage"/>
   <property name="build.package.java"  location="${build}/packjage/java"/>
@@ -80,9 +80,13 @@
   </target>
   
   <target name="dist" depends="package" description="Generates the distribution" >
+    <tstamp>
+      <format property="VERSION_DATE" pattern="MM-dd-yyy" locale="en,US"/>
+    </tstamp>
+  
     <mkdir dir="${dist}"/>
-    <zip destfile="${dist}/silbido-${silbido-version}.zip" basedir="${build.package}" />
-    <tar destfile="${dist}/silbido-${silbido-version}.tgz" basedir="${build.package}" compression="gzip" />
+    <zip destfile="${dist}/silbido-${VERSION_DATE}${silbido-suffix}.zip" basedir="${build.package}" />
+    <tar destfile="${dist}/silbido-${VERSION_DATE}${silbido-suffix}.tgz" basedir="${build.package}" compression="gzip" />
   </target>
 
   <target name="clean" description="clean up" >  
