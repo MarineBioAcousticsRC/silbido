@@ -12,7 +12,7 @@ import tonals.*;
 base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short_beaked/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short-test/';
-output_dir = 'sandbox/testing/results/';
+output_dir = 'src/sandbox/testing/results/';
 
 if exist(output_dir,'dir')
     rmdir(output_dir, 's');    

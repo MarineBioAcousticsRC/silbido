@@ -54,7 +54,7 @@ if nargout > 0
 end
 
 
-tt = TonalTracker(Filename,0,Inf);
+tt = TonalTracker(Filename, Start_s, Stop_s, varargin{:});
 tt.processFile();
 
 
