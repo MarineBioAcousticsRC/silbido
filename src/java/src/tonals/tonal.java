@@ -32,6 +32,10 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
     		}
     };
     
+    public tonal() {
+    	this(-1);
+    }
+    
 	public tonal(double graphId) {
 		super();
 		this.graphId = graphId;
@@ -47,6 +51,10 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
 		super();
 		this.addAll(node_list);
 		this.graphId = graphId;
+	}
+	
+	public tonal(double[] time, double[] freq) {
+		this(time, freq, -1);
 	}
 	
 	public tonal(double[] time, double[] freq, double graphId) {
@@ -252,7 +260,8 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
 		// Copy append_me into merged, skipping the first node
 		// if it is the same as the last in merged.
 		boolean skip = 
-			merged.getLast().compareTo(append_me.getFirst()) == 0;
+				merged.size() > 0 &&
+				merged.getLast().compareTo(append_me.getFirst()) == 0;
 		
 		for (tfnode n : append_me) {
 			if (skip)

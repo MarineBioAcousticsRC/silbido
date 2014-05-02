@@ -206,7 +206,7 @@ end
 axes(AxisH);
 
 while ~ done
-    fprintf('processing %f to %f\n', blkstart_s, blkstart_s + block_len_s );
+    %fprintf('processing %f to %f\n', blkstart_s, blkstart_s + block_len_s );
     % Read in the block and compute spectra
     [Signal, snr_dB, Indices, dft, clickP] = ...
         dtProcessBlock(handle, header, channel, ...

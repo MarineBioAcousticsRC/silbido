@@ -243,7 +243,7 @@ classdef TonalTracker < handle
         function startBlock(tt)
             % Retrieve the data for this block
             tt.StopBlock_s = min(tt.StartBlock_s + tt.block_padded_s, tt.Stop_s);
-            fprintf('Processing block from %.5f to %.5f\n', tt.StartBlock_s, tt.StopBlock_s);
+            %fprintf('Processing block from %.5f to %.5f\n', tt.StartBlock_s, tt.StopBlock_s);
             
             [~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
                 tt.handle, tt.header, tt.channel, ...

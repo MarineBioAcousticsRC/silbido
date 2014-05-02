@@ -42,14 +42,12 @@ public class graph implements Serializable {
 	public double resolutionHz;
 	public final double graphId;
 	
-	/*
-	 * Create a graph.
-	 * The first node given must be at one of the the following:
-	 * entry point - no predecessors
-	 * exit point - no successors
-	 * junction - 2 or more entries on the successor list,
-	 * 			the predecessor list, or both.
-	 */
+
+	public graph(tfnode n) {
+		this(n, -1);
+	}
+
+
 	public graph(tfnode n, double graphId) {
 		
 		this.graphId = graphId;

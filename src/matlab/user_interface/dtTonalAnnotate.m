@@ -648,7 +648,9 @@ end
 
 N = length(change.after);
 for idx = 1:length(change.after)
-    [handles.Rendered(end+1), data] = ...
+    % FIXME need to see if there is something we need to
+    % do about the ridge handles here.
+    [handles.Rendered(end+1), ~, data] = ...
         plot_tonal(change.after{idx}, handles, data);
 end
 
