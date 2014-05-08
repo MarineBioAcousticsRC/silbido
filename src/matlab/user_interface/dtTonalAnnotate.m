@@ -2750,8 +2750,8 @@ function HelpAnnotationTool_Callback(hObject, eventdata, handles)
 % hObject    handle to HelpAnnotationTool (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-dir = fileparts(mfilename);
-open(fullfile(dir, 'docs', 'Annotation.pdf'));
+dir = getDocsDir();
+open(fullfile(dir, 'Annotation.pdf'));
 
 
 % --------------------------------------------------------------------
@@ -2759,8 +2759,8 @@ function HelpSilbidoSetup_Callback(hObject, eventdata, handles)
 % hObject    handle to HelpSilbidoSetup (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-dir = fileparts(mfilename);
-open(fullfile(dir, 'docs', 'ReadMeFirst.pdf'));
+dir = getDocsDir();
+open(fullfile(dir, 'ReadMeFirst.pdf'));
 
 
 % --------------------------------------------------------------------
@@ -2768,8 +2768,8 @@ function HelpTonalsTracking_Callback(hObject, eventdata, handles)
 % hObject    handle to HelpTonalsTracking (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-dir = fileparts(mfilename);
-open(fullfile(dir, 'docs', 'Detector.pdf'));
+dir = getDocsDir();
+open(fullfile(dir, 'Detector.pdf'));
 
 
 % --------------------------------------------------------------------
@@ -2777,8 +2777,8 @@ function HelpManipulatingTonals_Callback(hObject, eventdata, handles)
 % hObject    handle to HelpManipulatingTonals (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-dir = fileparts(mfilename);
-open(fullfile(dir, 'docs', 'ManipulatingTonals.pdf'));
+dir = getDocsDir();
+open(fullfile(dir, 'ManipulatingTonals.pdf'));
 
 
 % --------------------------------------------------------------------
@@ -2786,9 +2786,15 @@ function HelpScoring_Callback(hObject, eventdata, handles)
 % hObject    handle to HelpScoring (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-dir = fileparts(mfilename);
-open(fullfile(dir, 'docs', 'Scoring.pdf'));
+dir = getDocsDir();
+open(fullfile(dir, 'Scoring.pdf'));
 
+function docs_dir=getDocsDir() 
+    docs_dir = fullfile(fileparts(mfilename('fullpath')), '../../../', 'docs');
+    if (~exist(docs_dir, 'dir'))
+        docs_dir = fullfile(fileparts(mfilename('fullpath')), '../../', 'docs');
+    end
+        
 
 % --- Executes on selection change in annotationsCombo.
 function annotationsCombo_Callback(hObject, eventdata, handles)

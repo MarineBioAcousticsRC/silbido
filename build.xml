@@ -83,6 +83,8 @@
     <copy todir="${build.package.docs}">
       <fileset dir="${basedir}/docs">
         <include name="**/*"/>
+        <exclude name="src"/>
+        <exclude name="src/**/*"/>
       </fileset>
     </copy>
   </target>
