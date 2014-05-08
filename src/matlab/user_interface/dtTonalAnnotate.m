@@ -1,8 +1,24 @@
 function varargout = dtTonalAnnotate(varargin)
-% dtTonalAnnotate(AudioFilename, OptionalArguments)
+% dtTonalAnnotate(OptionalArguments)
 % Whistle/Tonal annotation tool
 % Optional arguments in any order:
-%   'ParameterSet' 
+%   'ParameterSet'
+%   'Mode'
+%       Describes the mode for opening files.  Valid values are 'annotate'
+%       and 'analyze'.  In annote mode files are opened invididually to
+%       annotate them.  In 'analyze' mode a corpus is opened and the
+%       results of analysis are easily selectable in the user interface.
+%       the user can easily select files from within the corpus from a 
+%       tree component.
+%   'Filename'
+%       The file name of the file to open in 'annotate' mode.
+%   'CorpusBaseDir'
+%       The root directory of the corpus when in 'analyze' mode.
+%   'ScoringBaseDir'
+%       The root directory for the detection and scoring result files.
+%   'RelativeFilePath'
+%       The relative path to the file to open in 'analyze' mode. Relative 
+%       to the CorpusBaseDir.
 %   'Framing', [Advance_ms, Length_ms] - frame advance and length in ms
 %       Defaults to 2 and 8 ms respectively
 %   'Noise', method
@@ -3061,10 +3077,16 @@ function debugButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 min_s = Inf;
 max_s = -Inf;
-for idx=1:length(handles.Selected)
-    t = get(handles.Selected(idx), 'XData');
-    min_s = min(min_s, min(t));
-    max_s = max(max_s, max(t));
+
+if isempty(handles.Selected)
+    min_s = str2double(get(handles.Start_s, 'String'));
+    max_s = min_s + str2double(get(handles.ViewLength_s, 'String'));
+else
+    for idx=1:length(handles.Selected)
+        t = get(handles.Selected(idx), 'XData');
+        min_s = min(min_s, min(t));
+        max_s = max(max_s, max(t));
+    end
 end
 data = get(handles.Annotation, 'UserData');
 
