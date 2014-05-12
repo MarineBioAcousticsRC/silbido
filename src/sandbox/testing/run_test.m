@@ -18,7 +18,7 @@ if exist(output_dir,'dir')
     rmdir(output_dir, 's');    
 end
 
-test_files = getAllFiles(base_dir, '.wav');
+test_files = utFindFiles({'*.wav'}, base_dir);
 
 for i = 1:size(test_files,1)
     input_file = test_files{i};
@@ -40,4 +40,11 @@ for i = 1:size(test_files,1)
 end
 
 results = scoreall('.det', base_dir, [output_dir '/score.txt'], output_dir);
+
+% results = scoreall( ...
+%     'DetExt', '.det', ...
+%     'Corpus', base_dir, ...
+%     'ResultName', [output_dir '/score'], ...
+%     'Detections', output_dir);
+
 dtAnalyzeResults(results);

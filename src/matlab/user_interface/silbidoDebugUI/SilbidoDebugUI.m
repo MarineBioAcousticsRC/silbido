@@ -1387,7 +1387,9 @@ data = get(handles.TrackingDebug, 'UserData');
 checked = get(handles.showFitCheckBox, 'Value');
 data.debugRenderingManager.setFitPlotsEnabled(checked);
 if checked
-    data.debugRenderingManager.plotFits(data.tt);
+    if isfield(data, 'tt')
+        data.debugRenderingManager.plotFits(data.tt);
+    end
 else
     data.debugRenderingManager.clearFits();
 end
