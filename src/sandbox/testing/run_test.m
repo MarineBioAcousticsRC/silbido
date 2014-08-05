@@ -18,16 +18,32 @@ if exist(output_dir,'dir')
     rmdir(output_dir, 's');    
 end
 
-test_files = utFindFiles({'*.wav'}, base_dir);
+changes_cache = 'src/sandbox/testing/cache/';
+
+
+test_files = utFindFiles({'*.wav'}, base_dir, true);
 
 for i = 1:size(test_files,1)
     input_file = test_files{i};
-    fprintf('Tracking Tonals for file %s ...', input_file);
-    
-    [detectedTonals, graphs] = dtTonalsTracking3(input_file,0,Inf);
-    
     [path, name, ~] = fileparts(input_file);
     rel_path = path(size(base_dir,2)+1:end);
+    
+    fprintf('Tracking Tonals for file %s ...\n', input_file);
+    
+    changes_file = fullfile(changes_cache, rel_path, [name , '.changes.mat']);
+    if exist(changes_file,'file')
+        load(changes_file, 'noiseBoundaries');
+    else
+        if (~isempty(rel_path))
+            mkdir(changes_cache,rel_path);
+        end
+        noiseBoundaries = detect_noise_changes_in_file(input_file, 0, Inf);
+        save(changes_file, 'noiseBoundaries');
+    end
+
+    [detectedTonals, graphs] = dtTonalsTracking3(input_file,0,Inf, 'NoiseBoundaries', noiseBoundaries);
+    
+    
     mkdir(fullfile(output_dir, rel_path));
     
     output_file_base = fullfile(output_dir,rel_path,name);

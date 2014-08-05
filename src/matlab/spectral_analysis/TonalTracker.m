@@ -46,6 +46,9 @@ classdef TonalTracker < handle
         
         removeTransients;
         removalMethod;
+        noiseBoundaries;
+        blocks;
+        block_idx;
     end
     
     methods
@@ -142,6 +145,8 @@ classdef TonalTracker < handle
                         tt.removeTransients = varargin{k+1}; k=k+2;
                     case 'RemovalMethod'
                         tt.removalMethod = varargin{k+1}; k=k+2;
+                    case 'NoiseBoundaries'
+                        tt.noiseBoundaries = varargin{k+1}; k=k+2;
                     otherwise
                         try
                             if isnumeric(varargin{k})
@@ -236,24 +241,49 @@ classdef TonalTracker < handle
             tt.StartBlock_s = tt.Start_s;
             tt.frame_idx = 0;
             
+            if (isempty(tt.noiseBoundaries))
+                allBlocks = dtBlockBoundaries(...
+                    file_end_s, block_len_s, tt.block_pad_s, ...
+                    tt.Advance_s, tt.shift_samples_s);
+            else
+                allBlocks = dtBlockBoundariesFromNoiseBoundaries(...
+                    [tt.noiseBoundaries, file_end_s], block_len_s, 6, 0.5);
+            end
+            
+            tt.blocks = dtBlocksForSegment(allBlocks, tt.Start_s, min(tt.Stop_s, file_end_s));
+            tt.block_idx = 1;
+            
             fprintf('\nFile length %.5f\n', file_end_s);
             fprintf('Processing file from %.5f to %.5f\n', tt.Start_s, tt.Stop_s);
         end
         
         function startBlock(tt)
-            % Retrieve the data for this block
-            tt.StopBlock_s = min(tt.StartBlock_s + tt.block_padded_s, tt.Stop_s);
-            %fprintf('Processing block from %.5f to %.5f\n', tt.StartBlock_s, tt.StopBlock_s);
+            tt.StartBlock_s = tt.blocks(tt.block_idx,1);
+            tt.StopBlock_s = tt.blocks(tt.block_idx,2);
             
-            [~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
+            % Retrieve the data for this block
+            %tt.StopBlock_s = min(tt.StartBlock_s + tt.block_padded_s, tt.Stop_s);
+            
+            fprintf('Processing raw block from %.10f to %.10f\n', tt.StartBlock_s, tt.StopBlock_s);
+            %noiseBoundary = min(tt.noiseBoundaries(tt.noiseBoundaries > tt.StartBlock_s + tt.Advance_s & tt.noiseBoundaries < tt.StopBlock_s));
+            %if ~isempty(noiseBoundary) && false
+            %    tt.StopBlock_s = noiseBoundary + 2 * tt.block_pad_s;
+            %end
+
+            length_s = tt.StopBlock_s - tt.StartBlock_s;
+            %fprintf('Processing noise block from %.10f to %.10f\n', tt.StartBlock_s, tt.StopBlock_s);
+            
+            [~, ~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
                 tt.handle, tt.header, tt.channel, ...
-                tt.StartBlock_s, tt.block_padded_s, [tt.Length_samples, tt.Advance_samples], ...
+                tt.StartBlock_s, length_s, [tt.Length_samples, tt.Advance_samples], ...
                 'Pad', 0, 'Range', tt.range_bins, ...
                 'Shift', tt.shift_samples, ...
                 'ClickP', [tt.thr.broadband * tt.range_binsN, tt.thr.click_dB], ...
                 'RemoveTransients', tt.removeTransients, ...
                 'RemovalMethod', tt.removalMethod, ...
                 'Noise', {tt.NoiseSub});
+            
+            %fprintf('Processed indicies from %.10f to %.10f\n', tt.Indices.timeidx(1), tt.Indices.timeidx(end));
 
             % The first frame is 1, so we set this to zero, so we can call
             % advance, to get to the first frame.
@@ -354,7 +384,8 @@ classdef TonalTracker < handle
         end
         
         function advanceBlock(tt)
-            tt.StartBlock_s = tt.Indices.timeidx(end) + tt.Advance_s - tt.shift_samples_s;
+            %tt.StartBlock_s = tt.Indices.timeidx(end) + tt.Advance_s - tt.shift_samples_s;
+            tt.block_idx = tt.block_idx + 1;
         end
         
         function processBlock(tt)
@@ -373,7 +404,8 @@ classdef TonalTracker < handle
         function hasNext = hasNextBlock(tt)
             %hasNext = tt.StartBlock_s + 2 * tt.Length_s < tt.Stop_s;
             % This is a hack.
-            hasNext = tt.StartBlock_s + tt.block_padded_s + 2 * tt.Length_s < tt.Stop_s;
+            %hasNext = tt.StartBlock_s + tt.block_padded_s + 2 * tt.Length_s < tt.Stop_s;
+            hasNext = tt.block_idx < length(tt.blocks);
         end
         
         function hasNext = blockHasNextFrame(tt)

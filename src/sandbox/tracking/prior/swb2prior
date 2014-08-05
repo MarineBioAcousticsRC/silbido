@@ -1,0 +1,89 @@
+#!/bin/env python
+
+# prior_select N U
+# Select speakers from swb2
+# Currently selects the first U utterances of  N/2 female and N/2 male
+# speakers from switchboard 2.  If N is odd, N-1 is used.
+
+import os
+import re
+import sys
+
+Base = '/zal/mroch/speech/corpora/swb2'
+Src = os.path.join(Base, 'wav')
+Dest = os.path.join(Base, 'cep')
+
+SourceFile = "swb2CallsBySpeaker.txt"
+Corpus = "swb2"
+
+# FieldOrder
+SpeakerField = 0
+UtteranceField = 2
+SexField = 4
+
+def process(infile, outbase, N):
+
+    file = open(infile, 'r')
+
+    EndpointScript = open(outbase + "_ep.m", "w")
+    Wav2Cep = open(outbase + "_wav2cep", "w")
+    EndpointScript.write("tic\n");
+    EndpointScript.write("%% First %d token(s) from first %d females and %d males\n"%(
+        N["token"], N["F"], N["M"]))
+    EndpointScript.write("%% from %s\n"%(Corpus))
+    EndpointScript.write("\nSourceData = {\n")
+
+    Count = {"token":0, "F":0, "M":0}   # initialize counters
+    done = False
+
+    line = file.readline()
+    lastSpeaker = 0     # dummy speaker
+    while (not done and line != ""):
+        line = line.rstrip()    # strip trailing ws
+        
+        fields = line.split(';')
+
+        if len(fields) > 1:
+            speaker = fields[SpeakerField]
+            utterance = fields[UtteranceField]
+            sex = fields[SexField]
+            
+            if speaker != lastSpeaker:
+                lastSpeaker = speaker
+                # New speaker
+                # do we need any more of this type?
+                Collect = Count[sex] < N[sex]
+                if Collect:
+                    Count[sex] = Count[sex] + 1     # note new one
+                    Count["token"] = 0  # reset
+                    print "%d %s: %s"%(Count[sex], sex, speaker)
+                else:
+                    # check if we have enough of each type...
+                    done = Count["M"] >= N["M"] and Count["F"] >= N["F"]
+                    
+            # if more tokens needed...
+            if Collect:
+                EndpointScript.write("'%s'  %% Speaker %s, %s\n"%(
+                    utterance, speaker, sex))
+
+                Wav2Cep.write("%s %s\n"%(
+                    os.path.join(Src, "sw_%s.wav"%(utterance)),
+                    os.path.join(Dest, "sw_%s.mfc"%(utterance))))
+                Count["token"] = Count["token"] + 1
+                Collect = Count["token"] < N["token"]
+
+        line = file.readline()
+        # end loop
+    
+    EndpointScript.write("};\n")
+    EndpointScript.write("corEndpoint('%s', SourceData, 'kubala', "%(Corpus) + \
+                         "'FilenameFormat', 'sw_%s', " + \
+                         "'OutDir', '/zal/mroch/speech/corpora/swb2/wav/');\n")
+    EndpointScript.write("fprintf('Endpointing complete');\n" +
+                         "tock\n")
+    EndpointScript.close()
+    Wav2Cep.close()
+    
+
+                         
+process(SourceFile, "tmp", {"token":1, "F":100, "M":100})

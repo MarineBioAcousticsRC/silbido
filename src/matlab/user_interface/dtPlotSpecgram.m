@@ -1,4 +1,4 @@
-function [AxisH, ImageH, ColorbarH, snr_dB] = dtPlotSpecgram(File, Start_s, Stop_s, varargin)
+function [AxisH, ImageH, ColorbarH, snr_dB_blk, power_dB] = dtPlotSpecgram(File, Start_s, Stop_s, varargin)
 % dtPlotSpecgram(File, Start_s, Stop_s, OptionalArgs)
 % Plot spectrogram for specified file between start and stop time in s.
 %
@@ -136,7 +136,9 @@ handle = fopen(File, 'rb', 'l');
 % Select channel as per Triton
 channel = channelmap(header, File);
 
-Stop_s = min(Stop_s, header.Chunks{header.dataChunk}.nSamples/header.fs);
+file_end_s = header.Chunks{header.dataChunk}.nSamples/header.fs;
+
+Stop_s = min(Stop_s, file_end_s);
 if (Start_s >= Stop_s)
     error('Stop_s should be greater then Start');
 end
@@ -183,18 +185,18 @@ end
 shift_samples = floor(header.fs / thr.high_cutoff_Hz);
 shift_samples_s = shift_samples / header.fs;
 
+block_pad_s = 1 / thr.high_cutoff_Hz;
+
 % Determine what padding is needed.
 % padding will be added to each side of the current
 % audio data block and removed after the spectrogram
 % is computed.
-[block_pad_s, block_pad_frames] = ...
-    dtSpectrogramNoisePad(Length_s, Advance_s, NoiseComp{:});
+%[block_pad_s, block_pad_frames] = ...
+%    dtSpectrogramNoisePad(Length_s, Advance_s, NoiseComp{:});
 
 % Pad stopping point or set to end of file
 Stop_s = min(Stop_s + block_pad_s, ...
     header.Chunks{header.dataChunk}.nSamples/header.fs);
-
-blkstart_s = Start_s;
 
 done = false;
 hidx = 1;
@@ -205,12 +207,34 @@ end
 
 axes(AxisH);
 
-while ~ done
+Signal = [];
+power_dB = [];
+Indices = [];
+
+noiseBoundaries = [];
+
+if (isempty(noiseBoundaries))
+    allBlocks = dtBlockBoundaries(...
+        file_end_s, block_len_s, block_pad_s, ...
+        Advance_s, shift_samples_s);
+else
+    allBlocks = dtBlockBoundariesFromNoiseBoundaries(...
+        [noiseBoundaries, file_end_s], block_len_s, 6, 0.5);
+end
+
+blocks = dtBlocksForSegment(allBlocks, Start_s, min(Stop_s, file_end_s));
+block_idx = 1;            
+while (block_idx <= size(blocks,1))
+    
+    blkstart_s = blocks(block_idx,1);
+    blkend_s = blocks(block_idx,2);
+    length_s = blkend_s - blkstart_s;
+    
     %fprintf('processing %f to %f\n', blkstart_s, blkstart_s + block_len_s );
     % Read in the block and compute spectra
-    [Signal, snr_dB, Indices, dft, clickP] = ...
+    [Signal_blk, power_dB_blk, snr_dB_blk, Indices_blk, dft_blk, clickP_blk] = ...
         dtProcessBlock(handle, header, channel, ...
-        blkstart_s, block_len_s, [Length_samples, Advance_samples], ...
+        blkstart_s, length_s, [Length_samples, Advance_samples], ...
         'Pad', 0, 'Range', range_bins, ...
         'Shift', shift_samples, ...
         'ClickP', [thr.broadband * range_binsN, thr.click_dB], ...
@@ -222,10 +246,10 @@ while ~ done
        case {'grey', 'gray'}
            % do nothing
        case 'binary'
-           snr_dB(snr_dB < thr.whistle_dB) = 0;   % Threshold image
-           snr_dB(snr_dB >= thr.whistle_dB) = 1;
+           snr_dB_blk(snr_dB_blk < thr.whistle_dB) = 0;   % Threshold image
+           snr_dB_blk(snr_dB_blk >= thr.whistle_dB) = 1;
        case 'floor'
-           snr_dB(snr_dB < thr.whistle_dB) = 0;   % Threshold image
+           snr_dB_blk(snr_dB_blk < thr.whistle_dB) = 0;   % Threshold image
        otherwise
            error('Bad render type %s', Render);
     end
@@ -236,13 +260,13 @@ while ~ done
 %         snr_dB(:,Indices.FrameLastComplete+1:end) = [];
 %     end
     % plot the block
-    ImageH(hidx) = image(Indices.timeidx, fkHz, snr_dB, 'Parent', AxisH);  
-    colorData = (contrast_Pct/100) .* snr_dB + bright_dB;
+    ImageH(hidx) = image(Indices_blk.timeidx, fkHz, snr_dB_blk, 'Parent', AxisH);  
+    colorData = (contrast_Pct/100) .* snr_dB_blk + bright_dB;
     set(ImageH(hidx), 'CData', colorData);
     
     % Store the snr, brightness and contrast in UserData structure
     % associated with the image
-    pwr_brt_cont.snr_dB = snr_dB;
+    pwr_brt_cont.snr_dB = snr_dB_blk;
     pwr_brt_cont.bright_dB = bright_dB;
     pwr_brt_cont.contrast_Pct = contrast_Pct;
     pwr_brt_cont.threshold_dB = -Inf;
@@ -255,8 +279,11 @@ while ~ done
     hold on;
 
     % set start to next frame
-    blkstart_s = Indices.timeidx(end) + Advance_s - shift_samples_s;
-    done = blkstart_s + Length_s >= Stop_s;
+    %blkstart_s = Indices_blk.timeidx(end) + Advance_s - shift_samples_s;
+    %done = blkstart_s + Length_s >= Stop_s;
+    block_idx;
+    block_idx = block_idx + 1;
+    power_dB = horzcat(power_dB, power_dB_blk);
 end
 
 fclose(handle);
