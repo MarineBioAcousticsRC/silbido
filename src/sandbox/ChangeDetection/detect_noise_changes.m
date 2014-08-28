@@ -1,3 +1,5 @@
+%% This file is not real.
+
 function changes = detect_noise_changes(SourceData, FramesPerSecond, StartTime, varargin)
 % trkCettolo(SourceData, varargin)
 %

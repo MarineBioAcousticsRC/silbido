@@ -7,7 +7,7 @@ function varargout = SilbidoDebugUI(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 01-Dec-2013 20:24:13
+% Last Modified by GUIDE v2.5 21-Aug-2014 09:04:14
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -104,6 +104,7 @@ data.FigureTitle = '';
 data.ms_per_s = 1000;
 data.thr.advance_s = data.thr.advance_ms / data.ms_per_s;
 
+data.noiseBoundaries = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % processs arguments
@@ -116,6 +117,9 @@ while k <= length(varargin)
             k=k+2;
         case 'ViewLength'
             viewLengthSeconds = varargin{k+1};
+            k=k+2;
+        case 'NoiseBoundaries'
+            data.noiseBoundaries = varargin{k+1};
             k=k+2;
         otherwise
             error('Unknown paramters %s', varargin{k});
@@ -163,6 +167,10 @@ data.ViewLength_s = viewLengthSeconds;
 set(handles.ViewLength_s, 'String', num2str(viewLengthSeconds));
 
 linkaxes([handles.spectrogram, handles.progressAxes], 'x');
+
+data.blocks = dtBlockBoundaries(data.noiseBoundaries,...
+    data.Stop_s, data.tt.thr.blocklen_s, data.tt.block_pad_s, ...
+    data.thr.advance_s, data.tt.shift_samples_s);
 
 SaveDataInFigure(handles, data);  % save user/figure data before plot
 [handles, data] = spectrogram(handles, data);
@@ -720,6 +728,14 @@ contrast = get(handles.Contrast, 'Value');
 
 colormap(data.SpecgramColormap);
 
+nb = [];
+
+% if (handles.noiseBondariesToggle
+
+if strcmpi(get(handles.noiseBondariesToggle, 'State'), 'on')
+    nb = data.noiseBoundaries;
+end
+
 % minimum value may be set < 0 for knot editing
 % make sure spectrogram is >= 0
 low_spec_Hz = max(0, data.low_disp_Hz);
@@ -733,6 +749,7 @@ low_spec_Hz = max(0, data.low_disp_Hz);
         'RemoveTransients', data.RemoveTransients, ...
         'RemovalMethod', data.RemovalMethod, ...
         'Range', [low_spec_Hz, data.high_disp_Hz], ...
+        'NoiseBoundaries', nb,...
         RenderOpts{:});
     
 if data.low_disp_Hz < low_spec_Hz
@@ -1410,3 +1427,57 @@ data = get(handles.TrackingDebug, 'UserData');
 data.pauseAtNextPeak = true;
 SaveDataInFigure(handles, data);
 execute(handles);
+
+
+% --------------------------------------------------------------------
+function noiseBondariesToggle_ClickedCallback(hObject, eventdata, handles)
+% hObject    handle to noiseBondariesToggle (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+data = get(handles.TrackingDebug, 'UserData');
+[handles, data] = spectrogram(handles, data);
+SaveDataInFigure(handles, data);
+
+
+% --------------------------------------------------------------------
+function showNoiseBoundariesToggle_ClickedCallback(hObject, eventdata, handles)
+% hObject    handle to showNoiseBoundariesToggle (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+data = get(handles.TrackingDebug, 'UserData');
+if strcmpi(get(handles.showNoiseBoundariesToggle, 'State'), 'on')
+    blkstart_s = str2double(get(handles.Start_s, 'String'));
+    blkstop_s = blkstart_s + str2double(get(handles.ViewLength_s, 'String'));
+    blocks = dtBlocksForSegment(data.blocks, blkstart_s, blkstop_s);
+    
+    boundaries = data.noiseBoundaries(data.noiseBoundaries >= blkstart_s);
+    boundaries = boundaries(boundaries <= blkstop_s);
+    
+    lim = ylim(handles.spectrogram);
+    boundary_handles = [];
+    for idx = 1:size(blocks,1)
+        xval = blocks(idx,1);
+        h = plot(handles.spectrogram, ... 
+            [xval xval], ...
+            lim,...
+            'c-');
+        boundary_handles = [boundary_handles, h];
+    end
+    
+    for idx = 1:length(boundaries)
+        h = plot(handles.spectrogram, ... 
+            [boundaries(idx) boundaries(idx)], ...
+            lim,...
+            'r-');
+        boundary_handles = [boundary_handles, h];
+    end
+    
+    
+    data.boundary_handles = boundary_handles;
+else
+    for idx = 1:length(data.boundary_handles)
+        delete(data.boundary_handles(idx));
+    end
+    data.boundary_handles = [];
+end
+SaveDataInFigure(handles, data);

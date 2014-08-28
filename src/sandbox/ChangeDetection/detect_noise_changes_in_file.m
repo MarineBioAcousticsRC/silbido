@@ -323,7 +323,7 @@ while (Search.Window(end) < TotalCSACount)
             trkWindowAdjust(Search, WinHighUnit, Peaks, ...
             DeltaHighUnit, TotalCSACount,MinimumPoints);
         
-        if Search.Window(end) > CSACount
+        if Search.Window(end) > CSACount && Search.Window(end) < TotalCSACount
             [CSA, CSACount, BlockStartS, BlockEndS] = loadNextBlockAndMergeCSA(CSA, BlockEndS, WinS.WindowMax, DeltaFrames, CSAArgs, sp_args);
         end
 

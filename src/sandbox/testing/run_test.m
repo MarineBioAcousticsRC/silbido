@@ -6,10 +6,13 @@ end
 
 import tonals.*;
 
+enableChangeDetection = false;
+
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/filter_test/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/trouble/';
-base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
+%base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
+base_dir = '/Users/michael/development/sdsu/silbido/corpora/eval-data/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short_beaked/';
 %base_dir = '/Users/michael/development/sdsu/silbido/corpora/short-test/';
 output_dir = 'src/sandbox/testing/results/';
@@ -30,15 +33,19 @@ for i = 1:size(test_files,1)
     
     fprintf('Tracking Tonals for file %s ...\n', input_file);
     
-    changes_file = fullfile(changes_cache, rel_path, [name , '.changes.mat']);
-    if exist(changes_file,'file')
-        load(changes_file, 'noiseBoundaries');
-    else
-        if (~isempty(rel_path))
-            mkdir(changes_cache,rel_path);
+    if (enableChangeDetection)
+        changes_file = fullfile(changes_cache, rel_path, [name , '.changes.mat']);
+        if exist(changes_file,'file')
+            load(changes_file, 'noiseBoundaries');
+        else
+            if (~isempty(rel_path))
+                mkdir(changes_cache,rel_path);
+            end
+            noiseBoundaries = detect_noise_changes_in_file(input_file, 0, Inf);
+            save(changes_file, 'noiseBoundaries');
         end
-        noiseBoundaries = detect_noise_changes_in_file(input_file, 0, Inf);
-        save(changes_file, 'noiseBoundaries');
+    else
+        noiseBoundaries = [];
     end
 
     [detectedTonals, graphs] = dtTonalsTracking3(input_file,0,Inf, 'NoiseBoundaries', noiseBoundaries);

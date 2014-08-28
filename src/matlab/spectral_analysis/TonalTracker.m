@@ -241,14 +241,10 @@ classdef TonalTracker < handle
             tt.StartBlock_s = tt.Start_s;
             tt.frame_idx = 0;
             
-            if (isempty(tt.noiseBoundaries))
-                allBlocks = dtBlockBoundaries(...
-                    file_end_s, block_len_s, tt.block_pad_s, ...
-                    tt.Advance_s, tt.shift_samples_s);
-            else
-                allBlocks = dtBlockBoundariesFromNoiseBoundaries(...
-                    [tt.noiseBoundaries, file_end_s], block_len_s, 6, 0.5);
-            end
+
+            allBlocks = dtBlockBoundaries(tt.noiseBoundaries, ...
+                file_end_s, block_len_s, tt.block_pad_s, ...
+                tt.Advance_s, tt.shift_samples_s);
             
             tt.blocks = dtBlocksForSegment(allBlocks, tt.Start_s, min(tt.Stop_s, file_end_s));
             tt.block_idx = 1;

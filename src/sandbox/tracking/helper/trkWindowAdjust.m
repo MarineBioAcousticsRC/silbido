@@ -52,6 +52,8 @@ if PastEnd >= 0 && ~isempty(Peaks)
     TimeInPastEnd = 1;
     % Calculates if we have enought points to shift
     ShiftlftClear = ShiftleftAvail - LeftNeed;
+elseif PastEnd >= 0 && isempty(Peaks)
+    Search.Window(2) = CSACount;
 end
  Search = trkDistBICRange(Search.Window, ...
                 WinHighUnit.Margin, ...

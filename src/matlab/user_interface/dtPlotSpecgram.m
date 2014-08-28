@@ -62,6 +62,8 @@ RemovalMethod = '';
 thr = dtParseParameterSet(varargin{:});  % retrieve parameters
 block_len_s = thr.blocklen_s;        % process how much at a time
 
+noiseBoundaries = [];
+
 k = 1;
 while k <= length(varargin)
     switch varargin{k}
@@ -115,7 +117,8 @@ while k <= length(varargin)
             k=k+2;  % processed earlier            
         case 'AxisColor'
             AxisColor =  varargin{k+1}; k=k+2;
-            
+        case 'NoiseBoundaries'
+            noiseBoundaries = varargin{k+1}; k=k+2;
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -211,16 +214,9 @@ Signal = [];
 power_dB = [];
 Indices = [];
 
-noiseBoundaries = [];
-
-if (isempty(noiseBoundaries))
-    allBlocks = dtBlockBoundaries(...
-        file_end_s, block_len_s, block_pad_s, ...
-        Advance_s, shift_samples_s);
-else
-    allBlocks = dtBlockBoundariesFromNoiseBoundaries(...
-        [noiseBoundaries, file_end_s], block_len_s, 6, 0.5);
-end
+allBlocks = dtBlockBoundaries(noiseBoundaries, ...
+    file_end_s, block_len_s, block_pad_s, ...
+    Advance_s, shift_samples_s);
 
 blocks = dtBlocksForSegment(allBlocks, Start_s, min(Stop_s, file_end_s));
 block_idx = 1;            

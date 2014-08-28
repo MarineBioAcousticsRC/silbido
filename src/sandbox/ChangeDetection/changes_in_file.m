@@ -1,3 +1,5 @@
+% This file simply tests passing the noise bounadies to one file.
+
 
 output_dir = 'src/sandbox/testing/results/';
 if exist(output_dir,'dir')
