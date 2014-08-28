@@ -1,4 +1,4 @@
-addpath('/Users/michael/development/sdsu/silbido/matlab-src/utils');
+addpath('/Users/michael/development/silbido/matlab-src/utils');
 
 if (~exist('dtTonalsSave'))
     dev_init;
@@ -8,13 +8,13 @@ import tonals.*;
 
 enableChangeDetection = false;
 
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/filter_test/';
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/trouble/';
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
-base_dir = '/Users/michael/development/sdsu/silbido/corpora/eval-data/';
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/short_beaked/';
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/short-test/';
+%base_dir = '/Users/michael/development/silbido/corpora/filter_test/';
+%base_dir = '/Users/michael/development/silbido/corpora/paper_files/';
+%base_dir = '/Users/michael/development/silbido/corpora/trouble/';
+%base_dir = '/Users/michael/development/silbido/corpora/single_file_test/';
+base_dir = '/Users/michael/development/silbido/corpora/eval-data/';
+%base_dir = '/Users/michael/development/silbido/corpora/short_beaked/';
+%base_dir = '/Users/michael/development/silbido/corpora/short-test/';
 output_dir = 'src/sandbox/testing/results/';
 
 if exist(output_dir,'dir')

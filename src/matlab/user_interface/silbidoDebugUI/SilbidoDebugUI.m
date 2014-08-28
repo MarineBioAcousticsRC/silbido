@@ -141,6 +141,8 @@ set(handles.frameAdvanceField, 'String', num2str(data.thr.advance_ms));
 handles.colorbar = [];
 handles.image = [];
 
+data.boundary_handles = [];
+
 set(handles.TrackingDebug, 'Name', sprintf('%s%s Annotation [%s]', ...
     data.FigureTitle, fname, fdir));
 
@@ -169,6 +171,10 @@ set(handles.ViewLength_s, 'String', num2str(viewLengthSeconds));
 linkaxes([handles.spectrogram, handles.progressAxes], 'x');
 
 data.blocks = dtBlockBoundaries(data.noiseBoundaries,...
+    data.Stop_s, data.tt.thr.blocklen_s, data.tt.block_pad_s, ...
+    data.thr.advance_s, data.tt.shift_samples_s);
+
+data.defaultBlocks = dtBlockBoundaries([],...
     data.Stop_s, data.tt.thr.blocklen_s, data.tt.block_pad_s, ...
     data.thr.advance_s, data.tt.shift_samples_s);
 
@@ -791,6 +797,7 @@ progressPos = get(handles.progressAxes, 'Position');
 progressPos(3) = spectrogramPos(3);
 set(handles.progressAxes, 'Position', progressPos);
 set(handles.progressAxes, 'xlim', get(handles.spectrogram, 'xlim'));
+[data, handles] = updateNoiseBoundaries(handles);
 
 
 
@@ -1444,17 +1451,50 @@ function showNoiseBoundariesToggle_ClickedCallback(hObject, eventdata, handles)
 % hObject    handle to showNoiseBoundariesToggle (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+data = updateNoiseBoundaries(handles);
+SaveDataInFigure(handles, data);
+
+
+function [data, handles] = updateNoiseBoundaries(handles)
 data = get(handles.TrackingDebug, 'UserData');
+
+% clear anything we have rendered prsently
+for idx = 1:length(data.boundary_handles)
+    delete(data.boundary_handles(idx));
+end
+    
 if strcmpi(get(handles.showNoiseBoundariesToggle, 'State'), 'on')
-    blkstart_s = str2double(get(handles.Start_s, 'String'));
-    blkstop_s = blkstart_s + str2double(get(handles.ViewLength_s, 'String'));
-    blocks = dtBlocksForSegment(data.blocks, blkstart_s, blkstop_s);
-    
-    boundaries = data.noiseBoundaries(data.noiseBoundaries >= blkstart_s);
-    boundaries = boundaries(boundaries <= blkstop_s);
-    
-    lim = ylim(handles.spectrogram);
-    boundary_handles = [];
+    data.boundary_handles = drawNoiseBoundaries(handles);
+else
+    data.boundary_handles = [];
+end
+
+
+function boundary_handles = drawNoiseBoundaries(handles)
+data = get(handles.TrackingDebug, 'UserData');
+
+blkstart_s = str2double(get(handles.Start_s, 'String'));
+blkstop_s = blkstart_s + str2double(get(handles.ViewLength_s, 'String'));
+
+blocks = dtBlocksForSegment(data.blocks, blkstart_s, blkstop_s);
+defaultBlocks = dtBlocksForSegment(data.defaultBlocks, blkstart_s, blkstop_s);
+
+boundaries = data.noiseBoundaries(data.noiseBoundaries >= blkstart_s);
+boundaries = boundaries(boundaries <= blkstop_s);
+
+lim = ylim(handles.spectrogram);
+boundary_handles = [];
+
+if strcmpi(get(handles.noiseBondariesToggle, 'State'), 'off')
+    for idx = 1:size(defaultBlocks,1)
+        xval = defaultBlocks(idx,1);
+        h = plot(handles.spectrogram, ... 
+            [xval xval], ...
+            lim,...
+            'g-');
+        boundary_handles = [boundary_handles, h];
+    end
+else
     for idx = 1:size(blocks,1)
         xval = blocks(idx,1);
         h = plot(handles.spectrogram, ... 
@@ -1463,7 +1503,7 @@ if strcmpi(get(handles.showNoiseBoundariesToggle, 'State'), 'on')
             'c-');
         boundary_handles = [boundary_handles, h];
     end
-    
+
     for idx = 1:length(boundaries)
         h = plot(handles.spectrogram, ... 
             [boundaries(idx) boundaries(idx)], ...
@@ -1471,13 +1511,4 @@ if strcmpi(get(handles.showNoiseBoundariesToggle, 'State'), 'on')
             'r-');
         boundary_handles = [boundary_handles, h];
     end
-    
-    
-    data.boundary_handles = boundary_handles;
-else
-    for idx = 1:length(data.boundary_handles)
-        delete(data.boundary_handles(idx));
-    end
-    data.boundary_handles = [];
 end
-SaveDataInFigure(handles, data);

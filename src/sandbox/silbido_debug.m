@@ -1,4 +1,4 @@
-CorpusBaseDir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
+CorpusBaseDir = '/Users/michael/development/silbido/corpora/paper_files/';
 RelativeFilePath = 'common/Qx-Dd-SCI0608-Ziph-060817-100219.wav';
 NoiseBoundariesFile = 'sandbox/testing/cache/Qx-Tt-SCI0608-N1-060814-121518.changes.mat';
 
