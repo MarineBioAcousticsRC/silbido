@@ -9,10 +9,10 @@ end
 changes_cache = 'src/sandbox/testing/cache/';
 
 
-%base_dir = '/Users/michael/development/sdsu/silbido/corpora/paper_files/';
+%base_dir = '/Users/michael/development/silbido/corpora/paper_files/';
 %filename ='common/Qx-Dc-SC03-TAT09-060516-171606.wav';
 
-base_dir = '/Users/michael/development/sdsu/silbido/corpora/single_file_test/';
+base_dir = '/Users/michael/development/silbido/corpora/single_file_test/';
 filename ='Qx-Tt-SCI0608-N1-060814-121518.wav';
 
 input_file = [base_dir, filename];

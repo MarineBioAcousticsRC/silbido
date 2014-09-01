@@ -221,6 +221,7 @@ classdef TonalTracker < handle
             % frequency of interest, we will not move an entire cycle. 
             % Oversampling should help us here.
             tt.shift_samples = floor(tt.header.fs / tt.thr.high_cutoff_Hz);
+            tt.shift_samples = 0;
             tt.shift_samples_s = tt.shift_samples / tt.header.fs; 
 
             tt.block_pad_s = 1 / tt.thr.high_cutoff_Hz;

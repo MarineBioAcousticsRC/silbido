@@ -227,7 +227,7 @@ end
 % not be processed.
 Advance_s = Advance_samples / header.fs;
 if start_pad > 0
-    startRange = [1:round(start_pad / Advance_s)];
+    startRange = 1:round(start_pad / Advance_s);
 else
     startRange = [];
 end

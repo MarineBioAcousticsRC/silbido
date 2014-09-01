@@ -7,7 +7,7 @@ function varargout = SilbidoDebugUI(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 21-Aug-2014 09:04:14
+% Last Modified by GUIDE v2.5 31-Aug-2014 13:20:04
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -389,7 +389,8 @@ function Rewind_Callback(hObject, eventdata, handles)
 
 data = get(handles.TrackingDebug, 'UserData');
 advance_s = getAdvance_s(handles);
-new_s = start_in_range(data.Start_s - advance_s, handles, data);
+current_s = str2double(get(handles.Start_s, 'String'));
+new_s = start_in_range(current_s - advance_s, handles, data);
 if data.Start_s ~= new_s
     set(handles.Start_s, 'String', num2str(new_s));
     data.Start_s = new_s;
@@ -405,8 +406,9 @@ function Advance_Callback(hObject, eventdata, handles)
 
 % Set start time to earliest specified by the user.
 data = get(handles.TrackingDebug, 'UserData');
+current_s = str2double(get(handles.Start_s, 'String'));
 advance_s = getAdvance_s(handles);
-new_s = start_in_range(data.Start_s + advance_s, handles, data);
+new_s = start_in_range(current_s + advance_s, handles, data);
 if data.Start_s ~= new_s
     set(handles.Start_s, 'String', num2str(new_s));
     data.Start_s = new_s;

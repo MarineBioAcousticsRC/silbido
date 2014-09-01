@@ -7,7 +7,7 @@ function varargout = ChagneDetectionUI(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 22-Jun-2014 08:14:44
+% Last Modified by GUIDE v2.5 28-Aug-2014 12:03:54
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -57,7 +57,7 @@ guidata(hObject, handles);
 data.thr = dtParseParameterSet(varargin{:});  % retrieve parameters
 
 % Defaults
-data.NoiseMethod = {'median'};
+data.NoiseMethod = {'none'};
 % spectrogram colors
 data.SpecgramColormap = bone();
 data.scale = 1000; % kHz
@@ -99,8 +99,8 @@ data.FigureTitle = '';
 
 data.ms_per_s = 1000;
 data.thr.advance_s = data.thr.advance_ms / data.ms_per_s;
-viewStartSeconds = 15;
-viewLengthSeconds = 25;
+viewStartSeconds = 0;
+viewLengthSeconds = 7;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % processs arguments
@@ -122,6 +122,38 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Variables
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Change Detection
+
+DeltaMS = struct();
+DeltaMS.Low = 500; % Low resolution search interval
+DeltaMS.High = 50; % High resolution search interval
+data.DeltaMS = DeltaMS;
+
+set(handles.deltaLow, 'String', num2str(DeltaMS.Low ));
+set(handles.deltaHigh, 'String', num2str(DeltaMS.High));
+
+WinS = struct();
+WinS.WindowMin = 5;
+WinS.WindowMax = 10;
+WinS.Margin = .5;
+WinS.Growth = .5;
+WinS.Shift = 1;
+WinS.Second = 3;
+data.WinS = WinS;
+
+set(handles.windowMinSize, 'String', num2str(WinS.WindowMin));
+set(handles.windowMaxSize, 'String', num2str(WinS.WindowMax));
+set(handles.margin, 'String', num2str(WinS.Margin));
+set(handles.growth, 'String', num2str(WinS.Growth));
+set(handles.shift, 'String', num2str(WinS.Shift));
+set(handles.secondSize, 'String', num2str(WinS.Second));
+
+data.PenaltyWeight = .85;
+
+set(handles.penaltyWeight, 'String', num2str(data.PenaltyWeight));
+
+
 data.low_disp_Hz = data.thr.low_cutoff_Hz;
 set(handles.Low, 'String', num2str(data.low_disp_Hz));
 data.high_disp_Hz = data.thr.high_cutoff_Hz;
@@ -149,6 +181,8 @@ data.ViewLength_s = viewLengthSeconds;
 set(handles.ViewLength_s, 'String', num2str(viewLengthSeconds));
 
 linkaxes([handles.spectrogram, handles.bic], 'x');
+
+data.changeCallback = ChangePointCallback(handles.bic, handles.spectrogram);
 
 SaveDataInFigure(handles, data);  % save user/figure data before plot
 [handles, data] = spectrogram(handles, data);
@@ -650,9 +684,8 @@ cla(handles.bic);
 hold(handles.bic, 'on');
 
 hold(handles.spectrogram, 'on');
-
-cb = ChangePointCallback(handles.bic, handles.spectrogram);
-detect_noise_changes_in_file(data.Filename, blkstart_s, blkstop_s, 'Callback', cb);
+SaveDataInFigure(handles, data);
+detectChanges(handles);
 
 
 
@@ -790,3 +823,235 @@ function transientMenu_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+
+function windowMinSize_Callback(hObject, eventdata, handles)
+% hObject    handle to windowMinSize (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of windowMinSize as text
+%        str2double(get(hObject,'String')) returns contents of windowMinSize as a double
+data = get(handles.TrackingDebug, 'UserData');
+data.WinS.WindowMin = str2double(get(handles.windowMinSize, 'String'));
+SaveDataInFigure(handles, data);
+detectChanges(handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function windowMinSize_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to windowMinSize (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function windowMaxSize_Callback(hObject, eventdata, handles)
+% hObject    handle to windowMaxSize (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of windowMaxSize as text
+%        str2double(get(hObject,'String')) returns contents of windowMaxSize as a double
+data = get(handles.TrackingDebug, 'UserData');
+data.WinS.WindowMax = str2double(get(handles.windowMaxSize, 'String'));
+SaveDataInFigure(handles, data);
+detectChanges(handles);
+
+% --- Executes during object creation, after setting all properties.
+function windowMaxSize_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to windowMaxSize (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function margin_Callback(hObject, eventdata, handles)
+% hObject    handle to margin (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of margin as text
+%        str2double(get(hObject,'String')) returns contents of margin as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function margin_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to margin (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function growth_Callback(hObject, eventdata, handles)
+% hObject    handle to growth (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of growth as text
+%        str2double(get(hObject,'String')) returns contents of growth as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function growth_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to growth (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function shift_Callback(hObject, eventdata, handles)
+% hObject    handle to shift (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of shift as text
+%        str2double(get(hObject,'String')) returns contents of shift as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function shift_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to shift (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function secondSize_Callback(hObject, eventdata, handles)
+% hObject    handle to secondSize (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of secondSize as text
+%        str2double(get(hObject,'String')) returns contents of secondSize as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function secondSize_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to secondSize (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function deltaLow_Callback(hObject, eventdata, handles)
+% hObject    handle to deltaLow (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of deltaLow as text
+%        str2double(get(hObject,'String')) returns contents of deltaLow as a double
+data = get(handles.TrackingDebug, 'UserData');
+data.DeltaMS.Low = str2double(get(handles.deltaLow, 'String'));
+SaveDataInFigure(handles, data);
+detectChanges(handles);
+
+
+
+% --- Executes during object creation, after setting all properties.
+function deltaLow_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to deltaLow (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function deltaHigh_Callback(hObject, eventdata, handles)
+% hObject    handle to deltaHigh (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of deltaHigh as text
+%        str2double(get(hObject,'String')) returns contents of deltaHigh as a double
+data = get(handles.TrackingDebug, 'UserData');
+data.DeltaMS.High = str2double(get(handles.deltaHigh, 'String'));
+SaveDataInFigure(handles, data);
+detectChanges(handles);
+
+% --- Executes during object creation, after setting all properties.
+function deltaHigh_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to deltaHigh (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function penaltyWeight_Callback(hObject, eventdata, handles)
+% hObject    handle to penaltyWeight (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of penaltyWeight as text
+%        str2double(get(hObject,'String')) returns contents of penaltyWeight as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function penaltyWeight_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to penaltyWeight (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function detectChanges(handles)
+data = get(handles.TrackingDebug, 'UserData');
+data.changeCallback.clearRendering();
+detect_noise_changes_in_file(data.Filename, data.blkstart_s, data.blkstop_s, ...
+    'Delta', data.DeltaMS,...
+    'Window', data.WinS,...
+    'Callback', data.changeCallback, ...
+    'PeakSelection', {'Method', 'magnitude'}...
+);

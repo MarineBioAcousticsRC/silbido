@@ -2,7 +2,7 @@ function changes = detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS, 
 % trkCettolo(SourceData, varargin)
 %
 % Optional arguments:
-% 'Delta', {LowMS, HighMS}
+% 'DeltaMS', {Low, High}
 %       Specify the low and high resolution delta times in MS.
 %       Note that the algorithm uses the cumulative sum approach
 %       of Cettolo and requires many arguments to be multiples of
@@ -28,8 +28,6 @@ function changes = detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS, 
 %-------------------------------------------------------------------------%
 % Silbido Spectral Processing Parameters
 %-------------------------------------------------------------------------%
-
-sp_options = struct();
 
 thr.high_cutoff_Hz = 50000;
 thr.low_cutoff_Hz = 5000;
@@ -96,7 +94,7 @@ sp_args.EndTimeS = EndTimeS;
 DeltaMS.Low = 500;
 
 % High resolution search interval
-DeltaMS.High = 100;
+DeltaMS.High = 50;
 
 WinS.WindowMin = 5;
 WinS.WindowMax = 10;
@@ -116,15 +114,14 @@ while n <= length(varargin)
 
     switch varargin{n}
         case 'Delta'
-            [DeltaMS.Low, DeltaMS.High] = deal(varargin{n+1}{:});
+            DeltaMS = varargin{n+1};
             n=n+2;
             
         case 'Callback'
             cb = varargin{n+1};
             n=n+2;
         case 'Window'
-            [WinS.WindowMin, WinS.Max, WinS.Margin, WinS.Growth, ...
-                WinS.Shift, WinS.Second] = deal(varargin{n+1}{:});
+            WinS = varargin{n+1};
             n=n+2;
 
         case 'Method'
@@ -260,7 +257,7 @@ while (Search.Window(end) < TotalCSACount)
         Search = trkDistBICRange(...
             Search.Window, WinHighUnit.Margin, DeltaHighUnit.Low);
         
-        if Search.Window(end) > CSACount
+        if Search.Window(end) > CSACount && Search.Window(end) < TotalCSACount
             [CSA, CSACount, BlockStartS, BlockEndS] = loadNextBlockAndMergeCSA(CSA, BlockEndS, WinS.WindowMax, DeltaFrames, CSAArgs, sp_args);
         end
         
