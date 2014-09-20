@@ -25,7 +25,7 @@ else
     save(changes_file, 'noiseBoundaries');
 end
 
-[detectedTonals, graphs] = dtTonalsTracking3(input_file,0,Inf, 'NoiseBoundaries', noiseBoundaries);
+[detectedTonals, graphs] = dtTonalsTracking(input_file,0,Inf, 'NoiseBoundaries', noiseBoundaries);
     
 [path, name, ~] = fileparts(input_file);
 rel_path = path(size(base_dir,2)+1:end);

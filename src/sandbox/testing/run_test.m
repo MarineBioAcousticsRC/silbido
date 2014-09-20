@@ -48,7 +48,7 @@ for i = 1:size(test_files,1)
         noiseBoundaries = [];
     end
 
-    [detectedTonals, graphs] = dtTonalsTracking3(input_file,0,Inf, 'NoiseBoundaries', noiseBoundaries);
+    [detectedTonals, graphs] = dtTonalsTracking(input_file,0,Inf, 'NoiseBoundaries', noiseBoundaries);
     
     
     mkdir(fullfile(output_dir, rel_path));
