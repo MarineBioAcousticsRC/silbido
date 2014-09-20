@@ -583,8 +583,6 @@ data.Start_s = new_s;
 [handles, data] = spectrogram(handles, data);
 SaveDataInFigure(handles, data);
 
-1;
-
 
 % --- Executes during object creation, after setting all properties.
 function Start_s_CreateFcn(hObject, eventdata, handles)
@@ -738,8 +736,6 @@ colormap(data.SpecgramColormap);
 
 nb = [];
 
-% if (handles.noiseBondariesToggle
-
 if strcmpi(get(handles.noiseBondariesToggle, 'State'), 'on')
     nb = data.noiseBoundaries;
 end
@@ -799,7 +795,7 @@ progressPos = get(handles.progressAxes, 'Position');
 progressPos(3) = spectrogramPos(3);
 set(handles.progressAxes, 'Position', progressPos);
 set(handles.progressAxes, 'xlim', get(handles.spectrogram, 'xlim'));
-[data, handles] = updateNoiseBoundaries(handles);
+[data, handles] = updateNoiseBoundaries(data, handles);
 
 
 
@@ -1031,7 +1027,16 @@ data = get(handles.TrackingDebug, 'UserData');
 data.stopRequested = false;
 data.pauseRequested = false;
 data.debugRenderingManager.clearAll();
-tt = TonalTracker(data.Filename, data.blkstart_s, data.blkstop_s, 'SPCallback', data.debugRenderingManager);
+
+if (isfield(data, 'noiseBoundaries') && ...
+    strcmpi(get(handles.noiseBondariesToggle, 'State'), 'on'))
+    tt = TonalTracker(data.Filename, data.blkstart_s, data.blkstop_s, ...
+        'SPCallback', data.debugRenderingManager, ...
+        'NoiseBoundaries', data.noiseBoundaries);
+else
+    tt = TonalTracker(data.Filename, data.blkstart_s, data.blkstop_s, 'SPCallback', data.debugRenderingManager);
+end
+
 data.tt = tt;
 tt.startBlock();
 SaveDataInFigure(handles, data);
@@ -1453,13 +1458,12 @@ function showNoiseBoundariesToggle_ClickedCallback(hObject, eventdata, handles)
 % hObject    handle to showNoiseBoundariesToggle (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-data = updateNoiseBoundaries(handles);
+data = get(handles.TrackingDebug, 'UserData');
+data = updateNoiseBoundaries(data, handles);
 SaveDataInFigure(handles, data);
 
 
-function [data, handles] = updateNoiseBoundaries(handles)
-data = get(handles.TrackingDebug, 'UserData');
-
+function [data, handles] = updateNoiseBoundaries(data, handles)
 % clear anything we have rendered prsently
 for idx = 1:length(data.boundary_handles)
     delete(data.boundary_handles(idx));

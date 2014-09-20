@@ -35,6 +35,28 @@ switch Method
         % Mean for specific time
         power_dB = dtSNR_meanssub(power_dB, useP);
     
+    case 'distributional'
+        % Sort so that we can have an approximation of the cdf
+        power = 10.^(power_dB./20);
+        ordered = sort(power, 2);
+        % find the smallest 50% interval
+        [F, N] = size(ordered);
+        N2 = floor(N/2);
+        Last = N - rem(N, 2);  % ignore last column if odd
+        interval = ordered(:, N2+1:Last) - ordered(:,1:N2);
+        [best, bestIdx] = min(ordered, [], 2);
+        % compute the noise estimate
+        noise = ones(F, 1);
+        for f=1:F
+            noise(f) = mean(ordered(f, bestIdx(f):bestIdx(f)+N2));
+            power_dB(f,:) = power_dB(f,:) - 20*log10(noise(f));
+        end
+        
+        % follow up with a median filter
+        region = [3 3];
+        power_dB = medfilt2(power_dB, region);
+        1;
+        
     case 'ma'
         power_dB = medfilt2(power_dB, region);
         

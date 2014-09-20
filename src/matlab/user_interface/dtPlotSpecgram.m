@@ -257,7 +257,7 @@ while (block_idx <= size(blocks,1))
 %         snr_dB(:,Indices.FrameLastComplete+1:end) = [];
 %     end
     % plot the block
-    fprintf('Block(%.4f - %.4f) = TimeIdx(%.4f - %.4f)\n', blkstart_s, blkend_s, Indices_blk.timeidx(1), Indices_blk.timeidx(end));
+    %fprintf('Block(%.4f - %.4f) = TimeIdx(%.4f - %.4f)\n', blkstart_s, blkend_s, Indices_blk.timeidx(1), Indices_blk.timeidx(end));
     ImageH(hidx) = image(Indices_blk.timeidx, fkHz, snr_dB_blk, 'Parent', AxisH);  
     colorData = (contrast_Pct/100) .* snr_dB_blk + bright_dB;
     set(ImageH(hidx), 'CData', colorData);

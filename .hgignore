@@ -3,3 +3,5 @@ build
 dist
 eclipse
 src/java/bin
+src/sandbox/testing/cache
+src/sandbox/testing/results

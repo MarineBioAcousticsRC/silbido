@@ -231,7 +231,7 @@ Peaks = [];
 
 % Initialize the first search window.
 Search = trkDistBICRange(Search.Window, WinHighUnit.Margin, DeltaHighUnit.Low);
-while (Search.Window(end) < TotalCSACount)
+while (Search.Window(end) < TotalCSACount - 1)
     %fprintf('\nLow resolution search started for window: %s\n', searchToStr(Search, time));
     
     % Compute the BIC for the initial low resolution window.
@@ -249,15 +249,19 @@ while (Search.Window(end) < TotalCSACount)
     % we start to grow the window.
     while maxbic < 0 && ...
             trkWindowSize(Search.Window) < WinFrames.WindowMax && ...
-            Search.Window(end) < TotalCSACount
+            Search.Window(end) < TotalCSACount - 1
         % Grow the window making sure not to over run the end of the data.
         Search.Window(end) = min(...
-            TotalCSACount, Search.Window(end) + WinHighUnit.Growth);  
+            TotalCSACount - 1, Search.Window(end) + WinHighUnit.Growth);  
         
         Search = trkDistBICRange(...
             Search.Window, WinHighUnit.Margin, DeltaHighUnit.Low);
         
-        if Search.Window(end) > CSACount && Search.Window(end) < TotalCSACount
+        if Search.Window(end) >= TotalCSACount
+            fprintf "oops";
+        end
+        
+        if Search.Window(end) > CSACount
             [CSA, CSACount, BlockStartS, BlockEndS] = loadNextBlockAndMergeCSA(CSA, BlockEndS, WinS.WindowMax, DeltaFrames, CSAArgs, sp_args);
         end
         
@@ -276,15 +280,17 @@ while (Search.Window(end) < TotalCSACount)
     % At this point, if we still have not found anything, it means that
     % we have gown the window to its maximum size, so we start shifting
     % the window to the right in hopes of finding something.
-    while maxbic < 0 && Search.Window(end) < TotalCSACount
+    while maxbic < 0 && Search.Window(end) < TotalCSACount - 1
         % Shift, but not past the end.
         Shift = min(WinHighUnit.Shift, TotalCSACount - Search.Window(2));
         Search.Window = Search.Window + Shift;
         Search = trkDistBICRange(Search.Window, ...
             WinHighUnit.Margin, DeltaHighUnit.Low);
+        
         if Search.Window(end) > CSACount
             [CSA, CSACount, BlockStartS, BlockEndS] = loadNextBlockAndMergeCSA(CSA, BlockEndS, WinS.WindowMax, DeltaFrames, CSAArgs, sp_args);
         end
+        
         %fprintf('    No change detected. Shifting the low resolution window to: (%.2fs - %.2fs)\n', time(Search.Window(1)), time(Search.Window(end)));
         [maxbic, maxidx, bic] = trkBIC_CSA(CSA, Search, PenaltyWeight); 
         if exist('cb','var')

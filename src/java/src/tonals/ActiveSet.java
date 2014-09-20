@@ -79,6 +79,7 @@ public class ActiveSet {
 		activeSet = new tfTreeSet();
 		ridgeFrontier = new tfTreeSet();
 		this.partialGraphs = new HashMap<tfnode, PartialGraph>();
+		System.out.println("Using new code");
 	}
 	
 	public tfTreeSet getActiveSet() {
@@ -587,7 +588,7 @@ public class ActiveSet {
 //				int order = t.size() > 6?2:1;
 				int order = 1;
 				// far enough back, fit the polynomial
-				FitPoly fit = new FitPolyOrig(order, t, f);
+				FitPoly fit = FitPolyFactory.createFitPoly(order, t, f);
 
 				if (DEBUGGING) {
 					System.out.printf("%d order fit t=%s; f=%s;\n", order, t.toString(), f.toString());
@@ -600,7 +601,7 @@ public class ActiveSet {
 				// higher order fit, we live with the fit we have.
 				while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && t.size() > order*3) {
 					order++;
-					FitPoly newFit = new FitPolyOrig(order, t, f);
+					FitPoly newFit = FitPolyFactory.createFitPoly(order, t, f);
 					if(newFit.getAdjustedR2() > fit.getAdjustedR2()){
 						fit = newFit;
 					}

@@ -680,7 +680,7 @@ progressPos(3) = spectrogramPos(3);
 set(handles.bic, 'Position', progressPos);
 set(handles.bic, 'xlim', get(handles.spectrogram, 'xlim'));
 
-cla(handles.bic);
+
 hold(handles.bic, 'on');
 
 hold(handles.spectrogram, 'on');

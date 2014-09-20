@@ -425,7 +425,6 @@ public class graph implements Serializable {
 						tonal in_edge = in.content;
 						
 						// Error calculation
-						double fit_err_dphase = fit(in_edge, out_edge, disamb_thr_s, true);
 						double fit_err_slp = fit(in_edge, out_edge, disamb_thr_s, false);
 						
 						
@@ -765,9 +764,9 @@ public class graph implements Serializable {
 		// far enough back, fit the polynomial
 		FitPoly fit = null;
 		if (fit_dphase) {
-			fit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+			fit = FitPolyFactory.createFitPoly(order, path, skip_n, fit_dphase, incoming_edge);
 		} else {
-			fit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+			fit = FitPolyFactory.createFitPoly(order, path, skip_n, fit_dphase, incoming_edge);
 		}
 		
 		order = order + 1;
@@ -776,16 +775,15 @@ public class graph implements Serializable {
 		// that is somewhere near our quantization noise or
 		// if there are not enough points to get a good
 		// higher order fit, we live with the fit we have.
-		while (fit.getR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && path.size() > order*3) {
-//		while (fit.getAdjustedR2() < fit_thresh && path.size() > order*3) {
+		while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && path.size() > order*3) {
 			// lousy fit, try again
 //			order = order + 1;
 			FitPoly newFit;
 			
 			if (fit_dphase) {
-				newFit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+				newFit = FitPolyFactory.createFitPoly(order, path, skip_n, fit_dphase, incoming_edge);
 			} else {
-				newFit = new FitPolyOrig(order, path, skip_n, fit_dphase, incoming_edge);
+				newFit = FitPolyFactory.createFitPoly(order, path, skip_n, fit_dphase, incoming_edge);
 			}
 			
 			if(newFit.getAdjustedR2() > fit.getAdjustedR2()){
@@ -797,96 +795,7 @@ public class graph implements Serializable {
 		return fit;
 	}
 
-	private double fit_phase_vec (tonal in_edge, tonal out_edge, double disamb_thr_s) {
-		double in_vec_str = vector_str(in_edge, -disamb_thr_s);
-		double out_vec_str = vector_str(out_edge, disamb_thr_s);
-		return Math.abs(in_vec_str - out_vec_str);
-	}
 	
-	private double vector_str(tonal path, double how_far_s) {
-	
-		Iterator<tfnode> it;
-		
-		if (how_far_s >= 0) {
-			it = path.iterator();  // forward direction
-		} else {
-			it = path.descendingIterator();   // backward direction
-			how_far_s = -how_far_s;
-		}
-
-		// Skip N nodes of the tonal.
-		// Reason being that the phase at the the junction node and
-		// nearby nodes are influenced by the phase of each other due to closeness.
-		// Phase of these nodes does not represent correct phase information.
-		//
-		// In case of:
-		// incoming tonal skip last N nodes;
-		// outgoing tonal skip first N nodes.
-		int skip_n = 2;
-		
-		int n = path.size();
-		double elapsed_s = 0.0;
-		tfnode node = it.next();	
-		double start_s = node.time;
-		tfnode prev = null;
-		
-		double diff = 0.0;
-		double S = 0; // sin value
-		double C = 0; // cos value
-		int count = 0;
-		
-		if (n <= skip_n + 1) {
-			// Tonal not having enough node to skip.
-			// First difference of phase is calculated without 
-			// skipping the nodes.
-			
-			while (it.hasNext() & elapsed_s < how_far_s) {
-				prev = node;
-				node =  it.next();
-				elapsed_s = Math.abs(start_s - node.time);
-				// first phase difference
-				if (Math.signum(node.phase) == Math.signum(prev.phase))
-					diff = Math.abs(node.phase - prev.phase);
-				else {
-					if (node.phase < 0.0)
-						diff = Math.abs(node.phase) + prev.phase;
-					else
-						diff = Math.abs(prev.phase) + node.phase;
-				}
-				S = S + Math.sin(diff);
-				C = C + Math.cos(diff);
-				count++;
-			}
-			return (Math.sqrt(S*S + C*C) / count); // Vector strength
-		} else {
-			while (skip_n != 0) {
-				// skip N nodes
-				node = it.next();
-				skip_n--;
-				start_s = node.time;
-			}
-			while (it.hasNext() & elapsed_s < how_far_s) {
-				// First difference of phase is calculated after 
-				// skipping the nodes.
-				prev = node;
-				node =  it.next();
-				elapsed_s = Math.abs(start_s - node.time);
-				// first phase difference
-				if (Math.signum(node.phase) == Math.signum(prev.phase))
-					diff = Math.abs(node.phase - prev.phase);
-				else {
-					if (node.phase < 0.0)
-						diff = Math.abs(node.phase) + prev.phase;
-					else
-						diff = Math.abs(prev.phase) + node.phase;
-				}
-				S = S + Math.sin(diff);
-				C = C + Math.cos(diff);
-				count++;
-			}
-			return (Math.sqrt(S*S + C*C) / count); // Vector strength
-		}
-	}
 
 	/*
 	 * viable_pair
