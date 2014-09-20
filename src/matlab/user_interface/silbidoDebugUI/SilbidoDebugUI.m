@@ -143,7 +143,7 @@ handles.image = [];
 
 data.boundary_handles = [];
 
-set(handles.TrackingDebug, 'Name', sprintf('%s%s Annotation [%s]', ...
+set(handles.TrackingDebug, 'Name', sprintf('%s%s Debug [%s]', ...
     data.FigureTitle, fname, fdir));
 
 % I've observed some problems that may be due to a race condition.

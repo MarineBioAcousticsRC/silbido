@@ -1,20 +1,20 @@
-function varargout = ChagneDetectionUI(varargin)
-% ChagneDetectionUI(AudioFilename, OptionalArguments)
+function varargout = ChangeDetectionUI(varargin)
+% ChangeDetectionUI(AudioFilename, OptionalArguments)
 % Whistle/Tonal trackingdebug tool
 
 % Note:
-% This function requires ChagneDetectionUI.fig to be present and uses
+% This function requires ChangeDetectionUI.fig to be present and uses
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 28-Aug-2014 12:03:54
+% Last Modified by GUIDE v2.5 20-Sep-2014 09:09:22
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
-                   'gui_OpeningFcn', @ChagneDetectionUI_OpeningFcn, ...
-                   'gui_OutputFcn',  @ChagneDetectionUI_OutputFcn, ...
+                   'gui_OpeningFcn', @ChangeDetectionUI_OpeningFcn, ...
+                   'gui_OutputFcn',  @ChangeDetectionUI_OutputFcn, ...
                    'gui_LayoutFcn',  [] , ...
                    'gui_Callback',   []);
 if nargin && ischar(varargin{1})
@@ -33,19 +33,19 @@ end
 % Callbacks 
 % ====================================================================
 
-% --- Executes just before ChagneDetectionUI is made visible.
-function handles = ChagneDetectionUI_OpeningFcn(hObject, eventdata, handles, ...
+% --- Executes just before ChangeDetectionUI is made visible.
+function handles = ChangeDetectionUI_OpeningFcn(hObject, eventdata, handles, ...
     varargin)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-% varargin   command line arguments to ChagneDetectionUI 
+% varargin   command line arguments to ChangeDetectionUI 
 %            See file header for list
 
 % Verify correct number of inputs
 %error(nargchk(4,Inf,nargin));
-% Choose default command line output for ChagneDetectionUI
+% Choose default command line output for ChangeDetectionUI
 handles.output = hObject;
 
 % Update handles structure
@@ -165,7 +165,7 @@ set(handles.frameAdvanceField, 'String', num2str(data.thr.advance_ms));
 handles.colorbar = [];
 handles.image = [];
 
-set(handles.TrackingDebug, 'Name', sprintf('%s%s Annotation [%s]', ...
+set(handles.TrackingDebug, 'Name', sprintf('%s%s Changes [%s]', ...
     data.FigureTitle, fname, fdir));
 
 % I've observed some problems that may be due to a race condition.
@@ -190,7 +190,7 @@ SaveDataInFigure(handles, data);
 
                     
 % --- Outputs from this function are returned to the command line.
-function varargout = ChagneDetectionUI_OutputFcn(hObject, eventdata, handles) 
+function varargout = ChangeDetectionUI_OutputFcn(hObject, eventdata, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
