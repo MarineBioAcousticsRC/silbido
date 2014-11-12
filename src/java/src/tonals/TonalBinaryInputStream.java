@@ -139,10 +139,10 @@ public class TonalBinaryInputStream {
 				
 				// Read tonal itself
 				tonal t = null;
-				double graphId = -1;
+				long graphId = -1;
 				
 				if (hdr.version > 2) {
-					graphId = datastream.readDouble();
+					graphId = datastream.readLong();
 				}
 				int N = datastream.readInt();
 				LinkedList<tfnode> tfnodes = new LinkedList<tfnode>();

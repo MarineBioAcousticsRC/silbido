@@ -284,7 +284,12 @@ classdef TonalTracker < handle
 
             % The first frame is 1, so we set this to zero, so we can call
             % advance, to get to the first frame.
-            tt.frame_idx = 0;
+            if (tt.block_idx == 1)
+                timeidx = tt.Indices.timeidx;
+                tt.frame_idx = max(find(timeidx > tt.Start_s, 1) - 1, 0);
+            else
+                tt.frame_idx = 0;
+            end
             tt.advanceFrameInBlock();
             if (tt.callbackSet)
                tt.SPCallback.blockStarted(tt.snr_power_dB,tt.StartBlock_s,tt.StopBlock_s);

@@ -4,7 +4,9 @@ NoiseBoundariesDir = 'sandbox/testing/cache/';
 %% Paper Files
 CorpusBaseDir = '/Users/michael/development/silbido/corpora/paper_files/';
 
-RelativeFilePath = 'common/Qx-Dc-CC0411-TAT11-CH2-041114-154040-s';
+%RelativeFilePath = 'common/Qx-Dc-CC0411-TAT11-CH2-041114-154040-s';
+RelativeFilePath = 'bottlenose/Qx-Tt-SCI0608-N1-060814-121518';
+ 
 
 
 %% EVAL DATA

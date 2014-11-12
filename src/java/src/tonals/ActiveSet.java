@@ -1,6 +1,14 @@
 package tonals;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.NavigableSet;
+import java.util.PriorityQueue;
+import java.util.Stack;
+import java.util.Vector;
 
 
 // This used to be a set itself, which it should not be
@@ -65,7 +73,7 @@ public class ActiveSet {
 	 * A monotonically increasing graph id used to uniquely identify a graph 
 	 * within a particular graph generator.
 	 */
-	private double currentGraphId = 1; 
+	private long currentGraphId = 1; 
 	
 	/*
 	 * ActiveSet
@@ -147,33 +155,54 @@ public class ActiveSet {
 				int nrefs = graph.getReferenceCount() - 1;
 				graph.setReferenceCount(nrefs);
 
-
 				if (nrefs == 0) {
-					partialGraphs.remove(subgraph_id);
-
 					// We are removing the last reference to a subgraph
-					// from the active set.c
+					// from the active set.
+					double graphLengthTime = graph.getGraphLengthSeconds();
+					PartialGraph partialGraph = partialGraphs.remove(subgraph_id);
+					double cycleCountPerSecond = (double)partialGraph.getAvoidedCycleCount() / graphLengthTime;
+					double candidateJoinsPerSecond = (double)partialGraph.getCandidateJoinCount() / graphLengthTime;
+					
+					//System.out.println("Graph closed  " + partialGraph.getCycleCount() + " cycles and " + cycleCountPerSecond + " per second");
 
 					// Is the graph span long enough that there could
 					// be a tonal in here?
-					if (node.time - node.earliest_pred > minlen_s) {
-						// Construct explicit graph for further analysis.
-						resultGraphs.addLast(new graph(node, getNextGraphId()));
+					
+					if (graphLengthTime > minlen_s) {
+						if ((cycleCountPerSecond <= 1470 && candidateJoinsPerSecond <= 1700)) {
+							//System.out.println("Graph kept with " + cycleCountPerSecond + " cycles / sec");
+							// Construct explicit graph for further analysis.
+							resultGraphs.addLast(constructGraph(node, partialGraph));
+						} else {
+							//System.out.println("Graph discarded with " + cycleCountPerSecond + " cycles / sec");
+							discardedGraphs.addLast(constructGraph(node, partialGraph));
+						}
 					} else if (DEBUGGING && node.chained_backward()) {
 						// If we are debugging capture this graph.
-						discardedGraphs.addLast(new graph(node, getNextGraphId()));
+						//System.out.println("discarded graph that was to short.");
+						discardedGraphs.addLast(constructGraph(node, partialGraph));
 					}
 				}
 			}
 		}
 	}
 	
+	private graph constructGraph(tfnode node, PartialGraph pGraph) {
+		return new graph(node, 
+				getNextGraphId(), 
+				pGraph.getJunctionCount(), 
+				pGraph.getAvoidedCycleCount(), 
+				pGraph.getCandidateJoinCount(),
+				pGraph.getGraphLengthSeconds(),
+				pGraph.getGraphHeightFreq());
+	}
+	
 	/**
 	 * Returns the next graph id to use when constructing a graph.
 	 * @return The next graph id.
 	 */
-	private double getNextGraphId() {
-		double id = this.currentGraphId;
+	private long getNextGraphId() {
+		long id = this.currentGraphId;
 		currentGraphId++;
 		return id;
 	}
@@ -383,14 +412,19 @@ public class ActiveSet {
 			
 			if (join) {
 				if (c.object.to.chained_backward()) {
+					// We are joining to something that is already joined.  The graphs will
+					// be merged so we only need to increment the junction on one of the
+					// graphs.
+					PartialGraph fromGraph = partialGraphs.get(c.object.from.find());
+					fromGraph.incrementCandidateJoin();
+					
 					// peak is already linked to something
 					// see whether or not we want to extend this
 					if (joinExisting) {
-
 						// Don't allow the graph to join to itself
 						// This will cause problems when two whistles
 						// legitimately cross multiple times
-						// 
+						
 						// TODO:  What might be more appropriate is to have
 						// a common ancestor test within a given amount
 						// of time.  It looks like there are efficient
@@ -400,23 +434,13 @@ public class ActiveSet {
 						// fairly quickly.  We would only need to do it
 						// when a graph was jointing with itself.
 						//
-						if (join) {
-							// Don't permit a cycle to form
-							join = ! c.object.to.ismember(c.object.from);
-							PartialGraph partialGraph = partialGraphs.get(c.object.to.find());
-							partialGraph.setCycleCount(partialGraph.getCycleCount() + 1);
-						}
 						
-						// We used to do a poor-man's version of the
-						// least common ancestor search by checking
-						// if the peak is already joined
-						// to the goal via a direct (no choices) path
-						// This should not be necessary with the above
-						// 
-						// n = c.from;
-						// while (n.chained_forwardN() == 1)
-						//	n = n.successors.getFirst();
-						// join = c.to != n;						
+						// Don't permit a cycle to form
+						join = !c.object.to.ismember(c.object.from);
+						if (!join) {
+							// We just avoided a cycle.  Increment the avoided cycle count.
+							fromGraph.incrementAvoidedCycleCount();
+						}
 						
 						if (join) {
 							// Tonals that are very close to one another
@@ -499,23 +523,50 @@ public class ActiveSet {
 				
 				
 				
+				// Look up the graph for the from node.
+				tfnode from_root = c.object.from.find();
+				PartialGraph fromGraph = partialGraphs.get(from_root);
+				
+				// The to node now becomes the last node in the partial graph.
+				fromGraph.nodeAdded(c.object.to);
+				
+				// See if the to node was part of a graph.  If it was
+				// remove it and get a reference to it so we can merge.
+				tfnode to_root = c.object.to.find();
+				PartialGraph toGraph = partialGraphs.remove(to_root);
+				if (toGraph != null) {
+					fromGraph.merge(toGraph);
+				}
+				
+				// There are are two cases where we could be creating a new junction node,
+				// where one would not have existed before.
+				
+				// Case 1:
+				// If the from node is not-chained forward yet, then it is not presently a junction node.
+				// If also the to node is chained backwards exactly once, then the to node is not a junction
+				// node, but is about to become one.
+				//
+				// Case 2:
+				// If the from node is chained forward exactly once and the to node is not already chained
+				// backwards we will be creating a new junction node.
+				//
+				// In all other cases we are either not creating a junction node at all, or we are
+				// attaching another edge to a node that is already a junction node.
+				
+				if ((!c.object.from.chained_forward() && c.object.to.chained_backwardN() == 1) ||
+				    (c.object.from.chained_forwardN() == 1 && !c.object.to.chained_backward()) ) {
+					// If either the from node was already chained forward or if the to node
+					// was changed backwards then the new link we are about to create will 
+					fromGraph.incrementJuncionCount();
+				}
+				
 				c.object.from.chain_forward(c.object.to);  // add the link
 				c.object.to.fitError = c.score;
-				
-				tfnode old_root = c.object.to.find();
-				PartialGraph oldGraph = partialGraphs.remove(old_root);
-				
-				if (oldGraph != null) {
-					tfnode new_root = c.object.from.find();
-					PartialGraph newGraph = partialGraphs.get(new_root);
-					newGraph.merge(oldGraph);
-				}
 				
 				c.object.from.union(c.object.to); // merge subgraphs
 				// for now just do one, but we should find some type
 				// of threshold once we have a better handle on the
 				// fitness function
-				
 				
 //				if (c.object.to.ridge) {
 //					tfnode lastNode = c.object.to;
@@ -594,6 +645,7 @@ public class ActiveSet {
 					System.out.printf("%d order fit t=%s; f=%s;\n", order, t.toString(), f.toString());
 					System.out.printf("p=%s;\n", fit.toString());
 				}
+				
 				// If the bit is bad, try the next order up.  
 				// When the frequencies have a standard deviation
 				// that is somewhere near our quantization noise or
@@ -605,8 +657,10 @@ public class ActiveSet {
 					if(newFit.getAdjustedR2() > fit.getAdjustedR2()){
 						fit = newFit;
 					}
-					if (DEBUGGING)
+					
+					if (DEBUGGING) {
 						System.out.printf("Refit p=%s\n", fit.toString());
+					}
 				}
 				list.add(fit);
 				

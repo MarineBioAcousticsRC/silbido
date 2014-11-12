@@ -1,4 +1,4 @@
-function [ peak_density ] = stat_cumm_power_over_time(tonal)
+function [ peak_density ] = stat_cumm_power_over_time(tonal, sourceGraph)
 %Calculates the average number of peaks per unti of time
 %
     times = tonal.get_time();

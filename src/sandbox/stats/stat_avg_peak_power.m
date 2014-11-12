@@ -1,4 +1,4 @@
-function [ peak_density ] = stat_avg_peak_power(tonal)
+function [ peak_density ] = stat_avg_peak_power(tonal, sourceGraph)
 %Calculates the average number of peaks per unti of time
 %
     times = tonal.get_time();

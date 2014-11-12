@@ -1,4 +1,4 @@
-function [ freq_jerk ] = stat_time_freq_jerk( tonal )
+function [ freq_jerk ] = stat_time_freq_jerk(tonal, sourceGraph)
 %stat_tonal_jerk Summary of this function goes here
 %   Detailed explanation goes here
 times = tonal.get_time();

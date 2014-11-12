@@ -40,17 +40,24 @@ public class graph implements Serializable {
 	private ArrayList<edge<tfnode, tonal>> allEdges;
 
 	public double resolutionHz;
-	public final double graphId;
-	
+	public final long graphId;
+	public final long junctionCount;
+	public final long avoidedCycleCount;
+	public final long candidateJoinCount;
+	public final double graphLengthSeconds;
+	public final double graphHeightFreq;
 
 	public graph(tfnode n) {
-		this(n, -1);
+		this(n, 0l, 0l, 0l, 0l, 0d, 0d);
 	}
-
-
-	public graph(tfnode n, double graphId) {
-		
+	
+	public graph(tfnode n, long graphId, long junctionNodeCount, long avoidedCycleCount, long candidateJoinCount, double graphLengthSeconds, double graphHeightFreq) {
 		this.graphId = graphId;
+		this.junctionCount = junctionNodeCount;
+		this.avoidedCycleCount = avoidedCycleCount;
+		this.candidateJoinCount = candidateJoinCount;
+		this.graphLengthSeconds = graphLengthSeconds;
+		this.graphHeightFreq = graphHeightFreq;
 		
 		// initialize edge list maps
 		in = new HashMap<tfnode, LinkedList<edge<tfnode, tonal>>>();
@@ -66,8 +73,13 @@ public class graph implements Serializable {
 	}
 	
 	// Create a new copy of a graph. This is a deep copy
-	public graph(graph other, double graphId) {
-		this.graphId = graphId;
+	private graph(graph other) {
+		this.graphId = other.graphId;
+		this.junctionCount = other.junctionCount;
+		this.avoidedCycleCount = other.avoidedCycleCount;
+		this.candidateJoinCount = other.candidateJoinCount;
+		this.graphLengthSeconds = other.graphLengthSeconds;
+		this.graphHeightFreq = other.graphHeightFreq;
 		
 		in = map_clone(other.in);
 		out = map_clone(other.out);
@@ -81,8 +93,16 @@ public class graph implements Serializable {
 			this.nodes_out.add(exit);
 	}
 	
-	public double getGraphId() {
+	public long getGraphId() {
 		return graphId;
+	}
+	
+	public long getAvoidedCycleCount() {
+		return avoidedCycleCount;
+	}
+	
+	public long getJunctionCount() {
+		return junctionCount;
 	}
 	
 	// Moderately deep copy
@@ -341,7 +361,7 @@ public class graph implements Serializable {
 		// Create a moderately deep copy of this graph.
 		// The edge containers have fresh copies, but the edges
 		// and nodes are shared.
-		graph copy = new graph(this, this.graphId);
+		graph copy = this.clone();
 		copy.compress(disamb_thr_s, resolutionHz);
 		if (use_ridges) {
 			copy.process_bridges(ridge_thresh);
@@ -1134,7 +1154,9 @@ public class graph implements Serializable {
 		return new BridgeResult();
 	}
 	
-	
+	public graph clone() {
+		return new graph(this);
+	}
 	
 	/*
 	 * toString
