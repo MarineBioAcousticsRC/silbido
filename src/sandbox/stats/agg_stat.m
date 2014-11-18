@@ -10,7 +10,7 @@ detections_base = '/Users/michael/development/silbido/silbido-hg-repo/src/sandbo
 
 
 % These return one stat per tonal
-%stat_func = @(tonal, graph) stat_avg_nth_wait_times(tonal,2); % has potential
+%stat_func = @(tonal, graph) stat_avg_nth_wait_times(tonal,3); % has potential
 %stat_func = @stat_tonal_length;
 %stat_func = @stat_cumm_power_over_time;
 %stat_func = @stat_avg_peak_power;
@@ -27,7 +27,7 @@ detections_base = '/Users/michael/development/silbido/silbido-hg-repo/src/sandbo
 %stat_func = @stat_graph_cycles_per_area;
 %stat_func = @stat_graph_cycles_per_node;
 
-stat_func = @stat_graph_candidate_joins_per_second;
+%stat_func = @stat_graph_candidate_joins_per_second;
 %stat_func = @stat_graph_candidate_joins_per_area;
 %stat_func = @stat_graph_candidate_joins_per_node;
 

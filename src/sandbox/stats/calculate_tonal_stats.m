@@ -28,9 +28,9 @@ for idx=1:length(good_detection_rel_paths)
         sourceGraph = sourceGraps.get(java.lang.Long(graphId));
         
         stats = stat_func(tonal, sourceGraph);
-        if (stats > 1000)
-            fprintf('Filename: %s at time %f\n', gd_rel_path, sourceGraph.getAllNodes().get(0).time); 
-        end
+%         if (stats > 500)
+%             fprintf('Filename: %s at time %f\n', gd_rel_path, sourceGraph.getAllNodes().get(0).time); 
+%         end
         gd_stats = [gd_stats stats];
     end
 end
