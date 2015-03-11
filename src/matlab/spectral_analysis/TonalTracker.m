@@ -64,7 +64,7 @@ classdef TonalTracker < handle
             ActiveSet.setDebugging(false);
 
             % Settable Thresholds --------------------------------------------------
-            tt.thr.whistle_dB = 10;       % SNR criterion for whistles
+            tt.thr.whistle_dB = 9.8;       % SNR criterion for whistles
             tt.thr.click_dB = 10;         % SNR criterion for clicks (part of click skipping decision)
 
             % Whistles whose duration is shorter than threshold will be discarded.
@@ -567,9 +567,9 @@ classdef TonalTracker < handle
                     edge = segIt.next();
                     tone = edge.content;
                     if tone.get_duration() > tt.thr.minlen_s
-                        %if (stat_avg_nth_wait_times(tone,3) < 18)
+                        if (stat_avg_nth_wait_times(tone,3) < 18)
                           tonals.addLast(tone);
-                        %end
+                        end
                     else
                         tt.discarded_count = tt.discarded_count + 1;
                     end

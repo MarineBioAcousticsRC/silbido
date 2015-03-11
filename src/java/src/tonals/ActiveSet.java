@@ -169,7 +169,7 @@ public class ActiveSet {
 					// be a tonal in here?
 					
 					if (graphLengthTime > minlen_s) {
-						if (true || (cycleCountPerSecond <= 1470 && candidateJoinsPerSecond <= 1700)) {
+						if ((cycleCountPerSecond <= 1470 && candidateJoinsPerSecond <= 1700)) {
 							//System.out.println("Graph kept with " + cycleCountPerSecond + " cycles / sec");
 							// Construct explicit graph for further analysis.
 							resultGraphs.addLast(constructGraph(node, partialGraph));
