@@ -261,7 +261,7 @@ classdef TonalTracker < handle
             % Retrieve the data for this block
             %tt.StopBlock_s = min(tt.StartBlock_s + tt.block_padded_s, tt.Stop_s);
             
-            fprintf('Processing raw block from %.10f to %.10f\n', tt.StartBlock_s, tt.StopBlock_s);
+            %fprintf('Processing raw block from %.10f to %.10f\n', tt.StartBlock_s, tt.StopBlock_s);
             %noiseBoundary = min(tt.noiseBoundaries(tt.noiseBoundaries > tt.StartBlock_s + tt.Advance_s & tt.noiseBoundaries < tt.StopBlock_s));
             %if ~isempty(noiseBoundary) && false
             %    tt.StopBlock_s = noiseBoundary + 2 * tt.block_pad_s;
@@ -284,7 +284,12 @@ classdef TonalTracker < handle
 
             % The first frame is 1, so we set this to zero, so we can call
             % advance, to get to the first frame.
-            tt.frame_idx = 0;
+            if (tt.block_idx == 1)
+                timeidx = tt.Indices.timeidx;
+                tt.frame_idx = max(find(timeidx > tt.Start_s, 1) - 1, 0);
+            else
+                tt.frame_idx = 0;
+            end
             tt.advanceFrameInBlock();
             if (tt.callbackSet)
                tt.SPCallback.blockStarted(tt.snr_power_dB,tt.StartBlock_s,tt.StopBlock_s);
@@ -334,6 +339,78 @@ classdef TonalTracker < handle
                    foundPeaks = true;
                end
            end
+        end
+        
+         function foundPeaks = selectPeaksZimmer(tt)
+            % foundPeaks = selectPeaksZimmer(tt)
+            % Find peaks in the current frame based on
+            % power and acceleration
+            
+            foundPeaks = false;
+            tt.current_frame_peak_bins = [];
+            tt.current_frame_peak_freqs = [];
+            
+            % no smoothing for now, but pretend anyway
+            tt.smoothed_dB = tt.snr_power_dB(:, tt.frame_idx);
+            
+            % Peaks must meet SNR threshold and have a 2nd derivative
+            % that also exceeds threshold
+            %d2 = diff(tt.smoothed_dB, 2);
+            delta=2;  % frequency bin delta
+            d1 = tt.smoothed_dB(delta+1:end) - tt.smoothed_dB(1:end-delta);
+            d1 = [d1(1)*ones(delta,1); d1];
+            d2 = diff(d1);
+            d2 = [d2(1); d2];
+            d2_thresh = -2;  % was -1 earlier, not sure which is better
+
+            % Remove peaks that don't meet SNR & 2nd deriv criteria
+            peaks = find(tt.smoothed_dB > tt.thr.whistle_dB & ...
+                d2 < d2_thresh);
+            % When peaks are too close, pick the best one
+            % find peaks that are close to one another
+            close_thr = 1;
+            peak_dist = diff(peaks);
+            nearby = find(peak_dist <= close_thr);
+            % on the off chance that we have three consecutive peak dections
+            % 
+            if ~ isempty(nearby)
+                remove = zeros(length(nearby),1);
+                for nidx = 1:length(nearby)
+                    [~,rmoffset] = min(tt.smoothed_dB(peaks(nidx:nidx+1)));
+                    remove(nidx) = nearby(nidx) + rmoffset - 1;
+                end
+                peaks(remove) = [];
+            end
+            
+            
+            %peaks = consolidate_peaks(peaks, tt.smoothed_dB, 2);
+            
+            peakN = length(peaks);
+            if ~isempty(peaks)
+                % found something
+                
+                % If the number of peaks has increased dramatically between
+                % the last frame we processed, assume that we have a broadband
+                % signal (click) and skip this frame.
+                increase = (peakN - tt.peakN_last_processed) / tt.range_binsN;
+                if increase > tt.thr.broadband
+                    if (tt.callbackSet)
+                        tt.SPCallback.handleBroadbandFrame(tt.current_s);
+                    end
+                else
+                    % Convert the peak location to frequencies.
+                    peak_freq = (peaks - 1)* tt.bin_Hz + tt.OffsetHz;
+                    
+                    if (tt.callbackSet)
+                        tt.SPCallback.handleFramePeaks(tt.current_s, peak_freq);
+                    end
+                    
+                    tt.current_frame_peak_bins = peaks;
+                    tt.current_frame_peak_freqs = peak_freq;
+                    tt.peakN_last_processed = peakN;
+                    foundPeaks = true;
+                end
+            end
         end
         
         function freqs = getCurrentFramePeakFreqs(tt)
@@ -411,6 +488,7 @@ classdef TonalTracker < handle
         
         function processCurrentFrame(tt)            
             found = tt.selectPeaks();
+            %found = tt.selectPeaksZimmer();
             if (found)
                 tt.pruneAndExtend();
             end
@@ -489,7 +567,9 @@ classdef TonalTracker < handle
                     edge = segIt.next();
                     tone = edge.content;
                     if tone.get_duration() > tt.thr.minlen_s
-                        tonals.addLast(tone);
+                        if (stat_avg_nth_wait_times(tone,3) < 18)
+                          tonals.addLast(tone);
+                        end
                     else
                         tt.discarded_count = tt.discarded_count + 1;
                     end

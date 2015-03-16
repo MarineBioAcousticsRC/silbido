@@ -6,7 +6,7 @@ end
 
 import tonals.*;
 
-enableChangeDetection = true;
+enableChangeDetection = false;
 
 %base_dir = '/Users/michael/development/silbido/corpora/filter_test/';
 base_dir = '/Users/michael/development/silbido/corpora/paper_files/';

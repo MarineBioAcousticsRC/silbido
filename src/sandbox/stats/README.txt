@@ -1,0 +1,1 @@
+The function agg_stat is the main entry point of this code.

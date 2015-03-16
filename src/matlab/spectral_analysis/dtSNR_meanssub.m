@@ -7,11 +7,14 @@ function power_dB = dtSNR_meanssub(power_dB, useP)
 if nargin < 2
     useP = ones(size(power_dB, 2));
 end
-% Compute mean of each frequency
-meanf_dB = mean(power_dB(:, useP), 2);
-% typically faster to subtract on a frame by frame basis than to
-% build an entire matrix and subtract without a loop.
-last_frame = size(power_dB, 2);
-for frame_idx = 1:last_frame
-    power_dB(:,frame_idx) = power_dB(:,frame_idx) - meanf_dB;
+
+if ~ isempty(useP(useP > 0))
+    % Compute mean of each frequency
+    meanf_dB = mean(power_dB(:, useP), 2);
+    % typically faster to subtract on a frame by frame basis than to
+    % build an entire matrix and subtract without a loop.
+    last_frame = size(power_dB, 2);
+    for frame_idx = 1:last_frame
+        power_dB(:,frame_idx) = power_dB(:,frame_idx) - meanf_dB;
+    end
 end

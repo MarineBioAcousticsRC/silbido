@@ -4,11 +4,13 @@ NoiseBoundariesDir = 'sandbox/testing/cache/';
 %% Paper Files
 CorpusBaseDir = '/Users/michael/development/silbido/corpora/paper_files/';
 
-RelativeFilePath = 'common/Qx-Dc-CC0411-TAT11-CH2-041114-154040-s';
+%RelativeFilePath = 'common/Qx-Dc-CC0411-TAT11-CH2-041114-154040-s';
+RelativeFilePath = 'bottlenose/Qx-Tt-SCI0608-N1-060814-121518';
+ 
 
 
 %% EVAL DATA
-%CorpusBaseDir = '/Users/michael/development/silbido/corpora/eval-data/';
+CorpusBaseDir = '/Users/michael/development/silbido/corpora/eval-data/';
 
 
 % BOTTLENOSE
@@ -21,7 +23,7 @@ RelativeFilePath = 'common/Qx-Dc-CC0411-TAT11-CH2-041114-154040-s';
 
 % LONG BEAKED
 %RelativeFilePath = 'longbeaked/CC0707-TA33-070713-202000';
-%RelativeFilePath = 'longbeaked/CC0808-TA26-080826-163000';
+RelativeFilePath = 'longbeaked/CC0808-TA26-080826-163000';
 %RelativeFilePath = 'longbeaked/CC0810-TA30-081029-232000';
 
 % MELON HEADED
@@ -42,7 +44,7 @@ waveFile = fullfile(CorpusBaseDir, [RelativeFilePath, '.wav']);
 load(noiseFile, 'noiseBoundaries');
 
 SilbidoDebugUI(...
-    waveFile, ...
+    'Filename', waveFile, ...
     'ViewStart', 0, ...
     'ViewLength', 7, ...
     'NoiseBoundaries', noiseBoundaries);

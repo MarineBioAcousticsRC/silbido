@@ -1,4 +1,4 @@
-function [ power_jerk ] = stat_indiv_peak_power_jerk( tonal )
+function [ power_jerk ] = stat_indiv_peak_power_jerk(tonal, sourceGraph)
 %stat_tonal_jerk Summary of this function goes here
 %   Detailed explanation goes here
 times = tonal.get_time();

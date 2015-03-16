@@ -16,7 +16,7 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
 	private static int toStringLastN = 1;
 	private static int toStringFirstN = 2;
 	final double Pi2 = 2 * Math.PI;
-	final double graphId;
+	final long graphId;
 	
     /* provide interface for sorting by time 
      * which is not the natural order for this set
@@ -36,18 +36,18 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
     	this(-1);
     }
     
-	public tonal(double graphId) {
+	public tonal(long graphId) {
 		super();
 		this.graphId = graphId;
 	}
 	
-	public tonal(tfnode n, double graphId) {
+	public tonal(tfnode n, long graphId) {
 		super();
 		this.add(n);
 		this.graphId = graphId;
 	}
 	
-	tonal(AbstractSequentialList<tfnode> node_list, double graphId) {
+	tonal(AbstractSequentialList<tfnode> node_list, long graphId) {
 		super();
 		this.addAll(node_list);
 		this.graphId = graphId;
@@ -57,7 +57,7 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
 		this(time, freq, -1);
 	}
 	
-	public tonal(double[] time, double[] freq, double graphId) {
+	public tonal(double[] time, double[] freq, long graphId) {
 		// Create a tonal given arrays time and frequency.
 		super();
 		for (int i=0; i < time.length; i++)  {
@@ -67,7 +67,7 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
 		this.graphId = graphId;
 	}
 	
-	public double getGraphId() {
+	public long getGraphId() {
 		return graphId;
 	}
 	

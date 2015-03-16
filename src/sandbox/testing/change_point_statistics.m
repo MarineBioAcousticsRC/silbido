@@ -1,6 +1,7 @@
 function [] = change_point_statistics()
 
-changes_cache = 'src/sandbox/testing/cache/';
+[path, ~, ~] = fileparts(mfilename('fullpath'));
+changes_cache = fullfile(path, 'cache');
 changesFiles = utFindFiles({'*.mat'}, changes_cache, true);
 
 allLentghs = [];
