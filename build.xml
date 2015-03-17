@@ -15,6 +15,7 @@
   <property name="build.jar.name"  value="${build.jar}/silbido-classes-${silbido.version}${silbido.version.suffix}.jar"/>
   <property name="dist"  location="dist"/>
   <property name="java.src"  location="src/java/src"/>
+  <property name="java.dev.bin"  location="src/java/bin"/>
   <property name="java.build"  location="${build}/java"/>
   <property name="java.build.classes"  location="${build}/java"/>
   <property name="java.lib"  location="src/java/lib"/>
@@ -41,6 +42,14 @@
     <mkdir dir="${java.build.classes}"/>
     
     <javac srcdir="${java.src}" destdir="${java.build.classes}" includeantruntime="false" target="1.6" source="1.6">
+      <classpath refid="silbido-classpath"/>
+    </javac>
+  </target>
+  
+  <target name="dev" depends="" description="Compiles the silbido java classes.">
+    <mkdir dir="${java.dev.bin}"/>
+    
+    <javac srcdir="${java.src}" destdir="${java.dev.bin}" includeantruntime="false" target="1.6" source="1.6">
       <classpath refid="silbido-classpath"/>
     </javac>
   </target>
