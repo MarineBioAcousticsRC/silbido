@@ -42,7 +42,7 @@ function varargout = dtTonalAnnotate(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 01-Dec-2013 15:41:45
+% Last Modified by GUIDE v2.5 16-Mar-2015 07:36:05
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -2010,6 +2010,9 @@ if ~isempty(handles.image)   % remove old image panes before drawing new ones
     end
     handles.image = [];
 end
+if strcmp(get(handles.time_domain_toggle, 'State'), 'on')
+    RenderOpts(end+1:end+2) = {'TimeDomainPlot', handles.signal};
+end
 
 brightness = get(handles.Brightness, 'Value');
 contrast = get(handles.Contrast, 'Value');
@@ -2063,6 +2066,13 @@ end
 [handles, data] = plot_tonals(handles, data);
 if isfield(data, 'all_graphs')
     [handles, data] = plot_graphs(handles, data);
+end
+
+% This will break nested set/resets of the pointer, but the pointer
+% is not reset to arrow when an error occurs and the pointer is a watch
+% This is a workaround for this case.
+if strcmp(pointer, 'watch')
+    pointer = 'arrow';
 end
 set(handles.Annotation, 'Pointer', pointer);
 
@@ -3104,3 +3114,43 @@ function statsButton_Callback(hObject, eventdata, handles)
 % hObject    handle to statsButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function time_domain_toggle_ClickedCallback(hObject, eventdata, handles)
+% hObject    handle to time_domain_toggle (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+state = get(hObject, 'State');
+switch state
+    case 'on'
+       specposn = get(handles.spectrogram, 'Position');
+       signalposn = get(handles.signal, 'Position');
+       % find top of spectrogram (1-(y+height))
+       top = sum(specposn([2 4]));
+       % set bottom of spectrogram to just above time domain
+       specposn(2) = sum(signalposn([2 4]))+.05;
+       % set spectrogram height
+       specposn(4) = top - specposn(2);
+       set(handles.spectrogram, 'Position', specposn)
+       data = get(handles.Annotation, 'UserData');
+       % spectrogram plot may be narrower due to colorbar presence
+       % adjust time domain plot width so it corresponds
+       signalposn(3) = specposn(3);
+       set(handles.signal, 'Position', signalposn);
+       [handles, data] = spectrogram(handles, data);
+       SaveDataInFigure(handles, data);
+    case 'off'
+       specposn = get(handles.spectrogram, 'Position');
+       % find top of spectrogram (1-(y+height))
+       top = sum(specposn([2 4]));
+       signalposn = get(handles.signal, 'Position');
+       specposn(2) = signalposn(2);
+       specposn(4) = top - specposn(2);
+       set(handles.spectrogram, 'Position', specposn);
+end
+set(handles.signal, 'Visible', state);
+       
+       
+        

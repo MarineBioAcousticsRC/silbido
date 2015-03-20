@@ -37,6 +37,8 @@ function [AxisH, ImageH, ColorbarH, snr_dB_blk, power_dB] = dtPlotSpecgram(File,
 %       'binary' - index 0 below threshold, 1 above
 %       'floor' - index 0 below threshold, power above
 %   'TransferFn', true|false - enable transfer function if available
+%   'TimeDomainPlot', AxesH - Plot the time domain signal in the specified
+%       axis if given.
 %
 % Returns:
 % AxisH - axis handle to which plots were made
@@ -58,6 +60,7 @@ contrast_Pct = 200;
 TransferFn = false;
 RemoveTransients = false;
 RemovalMethod = '';
+TimePlotH = [];
 
 thr = dtParseParameterSet(varargin{:});  % retrieve parameters
 block_len_s = thr.blocklen_s;        % process how much at a time
@@ -119,6 +122,8 @@ while k <= length(varargin)
             AxisColor =  varargin{k+1}; k=k+2;
         case 'NoiseBoundaries'
             noiseBoundaries = varargin{k+1}; k=k+2;
+        case 'TimeDomainPlot' 
+            TimePlotH = varargin{k+1}; k=k+2;
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -220,7 +225,8 @@ allBlocks = dtBlockBoundaries(noiseBoundaries, ...
     Advance_s, shift_samples_s);
 
 blocks = dtBlocksForSegment(allBlocks, Start_s, min(Stop_s, file_end_s));
-block_idx = 1;            
+block_idx = 1;
+time_dynrange = 0;
 while (block_idx <= size(blocks,1))
     
     blkstart_s = blocks(block_idx,1);
@@ -276,14 +282,30 @@ while (block_idx <= size(blocks,1))
 
     hold on;
 
+    if ~ isempty(TimePlotH)
+        plot(TimePlotH, ...
+            linspace(blkstart_s, blkend_s, ...
+            (blkend_s - blkstart_s) * header.fs + 1), ...
+            Signal_blk);
+        time_dynrange = max(max(abs(Signal_blk)), time_dynrange);
+        set(TimePlotH, 'NextPlot', 'add');
+    end
     % set start to next frame
     %blkstart_s = Indices_blk.timeidx(end) + Advance_s - shift_samples_s;
     %done = blkstart_s + Length_s >= Stop_s;
     block_idx;
     block_idx = block_idx + 1;
     power_dB = horzcat(power_dB, power_dB_blk);
+    
+    
 end
 
+if ~ isempty(TimePlotH)
+    % Adjust dynamic range
+    set(TimePlotH, 'YLim', [-1 1] * time_dynrange*1.1);
+    set(TimePlotH, 'XLim', [Start_s, Stop_s]);
+    linkaxes([TimePlotH, AxisH], 'x');
+end
 fclose(handle);
 set(AxisH, 'XLim', [Start_s, Stop_s]);
 set(AxisH, 'YDir', 'normal');
@@ -305,6 +327,8 @@ if ~ isempty(AxisColor)
     set(ColorBarH, 'YColor', AxisColor);
     set(get(ColorBarH, 'YLabel'), 'Color', AxisColor);
 end
+
+    
 % We have modified the plot.  If the user has zoomed in before, we need
 % to let zoom know that the zoom limits have changed.
 zoom reset;
