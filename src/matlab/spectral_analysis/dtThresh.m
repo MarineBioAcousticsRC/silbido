@@ -9,7 +9,7 @@ thr.click_dB = 10;         % SNR criterion for clicks (part of click skipping de
 % Whistles whose duration is shorter than threshold will be discarded.
 thr.minlen_ms = 150;
 
-% Maximum gap in energy to bridge when looking for a tonal
+% Maximum gap in time to bridge when looking for a tonal
 thr.maxgap_ms = 50;
 
 % Maximum difference in frequency to bridge when looking for a tonal

@@ -74,6 +74,8 @@ data.NoiseMethod = {'median'};
 data.SpecgramColormap = bone();
 data.scale = 1000; % kHz
 
+data.noiseBoundaries = [];
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % processs arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -142,7 +144,6 @@ data.FigureTitle = '';
 data.ms_per_s = 1000;
 data.thr.advance_s = data.thr.advance_ms / data.ms_per_s;
 
-data.noiseBoundaries = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Variables

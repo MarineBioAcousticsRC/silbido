@@ -70,7 +70,7 @@ classdef TonalTracker < handle
             % Whistles whose duration is shorter than threshold will be discarded.
             tt.thr.minlen_ms = 150;
 
-            % Maximum gap in energy to bridge when looking for a tonal
+            % Maximum gap in time to bridge when looking for a tonal
             tt.thr.maxgap_ms = 50;
 
             % Maximum difference in frequency to bridge when looking for a tonal
@@ -566,10 +566,9 @@ classdef TonalTracker < handle
                 while segIt.hasNext()
                     edge = segIt.next();
                     tone = edge.content;
-                    if tone.get_duration() > tt.thr.minlen_s
-                        if (stat_avg_nth_wait_times(tone,3) < 18)
+                    if tone.get_duration() > tt.thr.minlen_s && stat_avg_nth_wait_times(tone,3) < 18
                           tonals.addLast(tone);
-                        end
+                        
                     else
                         tt.discarded_count = tt.discarded_count + 1;
                     end

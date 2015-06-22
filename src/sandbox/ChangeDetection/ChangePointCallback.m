@@ -18,7 +18,7 @@ classdef ChangePointCallback < handle
       end
       
       function onNoCandidateLowRes(cb, times, bic)
-          h = plot(cb.bicAxes, times, bic, '--c');
+          h = plot(cb.bicAxes, times, bic, '--m');
           cb.handles = [cb.handles, h];
       end
       

@@ -16,8 +16,8 @@ both(1:Nfp,2) = falsepos;
 figure('Name', 'Cumulative Distribution Function');
 plot(values_c, Fc, 'b', values_fp, Ffp, 'r');
 xlabel('stat')
-ylabel('P(STAT <= measurement)')
-legend('Correct', 'False Pos');
+ylabel('Cumulative Probability)')
+legend('Good', 'False Pos');
 
 figure('Name', 'Histogram')
 hist(both, 100);
