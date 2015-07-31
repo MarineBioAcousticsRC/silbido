@@ -13,6 +13,7 @@ base_dir = '/Users/michael/development/silbido/corpora/paper_files/';
 %base_dir = '/Users/michael/development/silbido/corpora/trouble/';
 %base_dir = '/Users/michael/development/silbido/corpora/single_file_test/';
 %base_dir = '/Users/michael/development/silbido/corpora/eval-data/';
+%base_dir = '/Users/michael/development/silbido/corpora/biowaves-2015/';
 %base_dir = '/Users/michael/development/silbido/corpora/short_beaked/';
 %base_dir = '/Users/michael/development/silbido/corpora/short-test/';
 output_dir = 'src/sandbox/testing/results/';
