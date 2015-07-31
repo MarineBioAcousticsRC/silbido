@@ -93,6 +93,10 @@ Signal = ioReadWav(handle, header, start, stop, ...
     'Units', 's', 'Channels', channel);
 
 if (false)
+    % Click deemphasis as described in
+    % Gillespie, D., Caillat, M., Gordon, J., and White, P. (2013). 
+    % "Automatic detection and classification of odontocete whistles," 
+    % J. Acous. Soc. Am. 134(3), 2427-2437.
     w = zeros(size(Signal));
     p = 6;
     t = 5;
