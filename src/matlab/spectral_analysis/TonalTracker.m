@@ -105,6 +105,7 @@ classdef TonalTracker < handle
                         k=k+2;
                     case 'SPCallback'
                         tt.SPCallback = varargin{k+1}; k=k+2;
+                        tt.thr = tt.SPCallback.thr;  % Override defaults
                         tt.callbackSet = true;
                     case 'RemoveTransients'
                         tt.removeTransients = varargin{k+1}; k=k+2;
