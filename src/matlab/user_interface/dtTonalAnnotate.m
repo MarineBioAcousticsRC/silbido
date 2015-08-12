@@ -2,7 +2,9 @@ function varargout = dtTonalAnnotate(varargin)
 % dtTonalAnnotate(OptionalArguments)
 % Whistle/Tonal annotation tool
 % Optional arguments in any order:
-%   'ParameterSet'
+%   'ParameterSet', Filename
+%       Override the default detection parameters.  Filename is passed
+%       directly to dtThresh, see that function for details.
 %   'Mode'
 %       Describes the mode for opening files.  Valid values are 'annotate'
 %       and 'analyze'.  In annote mode files are opened invididually to
@@ -3096,7 +3098,9 @@ else
 end
 data = get(handles.Annotation, 'UserData');
 
-SilbidoDebugUI(data.Filename, 'ViewStart', min_s, 'ViewLength', max_s - min_s);
+SilbidoDebugUI(data.Filename, ...
+    'ViewStart', min_s, 'ViewLength', max_s - min_s, ...
+    'ParameterSet', data.thr);
 
 
 % --- Executes on button press in statsButton.

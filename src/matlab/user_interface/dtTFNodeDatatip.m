@@ -5,10 +5,16 @@ function output_txt = datatip_tfnode(obj,event_obj)
 % output_txt   Data cursor text string (string or cell array of strings).
 
 timefreq = get(event_obj,'Position');
-if timefreq(2) < 5000
-    output_txt{1} = sprintf('%.3f s X %.3f kHz', timefreq(1), timefreq(2));
-else
-    output_txt{1} = sprintf('%.3f s X %.1f kHz', timefreq(1), timefreq(2));
+
+% Find frequency range over which we plotted.
+yrange = get(get(event_obj, 'Target'), 'YData');
+% Determine resolution for frequency display
+index = find(max(yrange) < [5, Inf], 1, 'first');
+switch index
+    case 1
+        output_txt{1} = sprintf('%.3f s X %.1f Hz', timefreq(1), timefreq(2)*1000);
+    case 2
+        output_txt{1} = sprintf('%.3f s X %.4f kHz', timefreq(1), timefreq(2));
 end
     
 
@@ -19,17 +25,27 @@ target = get(event_obj, 'Target');
 properties = get(target);
 
 if isfield(properties, 'CData')
-    % index in graphics obj (only partially documented)
+    % User clicked on image
+    
+    colordata = get(target, 'CData');  % energies at time/freq
+    
+    % Find index into pcolor data.  
+    % Not fully documented.  For line objects, datacursormode documentation
+    % indicates that this is an index to the closest point.  It appears
+    % that there is something similar for images.  
+    % Matlab 2013b returns row/colum and Matlab 2014b returns a single
+    % index.  
     tfidx = get(event_obj, 'DataIndex');   % time x frequency indiceif length(tfidx) > 1
-    % clicked on image
-    
-    % colormap access code derived from Mathworks
-    % default_getDatatipText.m
-    
-    tidx = tfidx(1);
-    fidx = tfidx(2);
-    colordata = get(target, 'CData');
+    if length(tfidx) > 1
+        tidx = tfidx(1);  % older Matlab
+        fidx = tfidx(2);
+    else
+        % Newer Matlab gives a single index into the matrix, convert
+        [fidx, tidx] = ind2sub(size(colordata), tfidx);
+    end
+            
     raw_cdata_value = colordata(fidx, tidx);
+
     % Non-double types are 0 based
     if isa(raw_cdata_value,'double')
         cdata_value = raw_cdata_value;

@@ -1,46 +1,39 @@
-function thr = dtThresh()
-% thr = dtThresh()
+function thr = dtThresh(Filename)
+% thr = dtThresh(Filename)
 % Get common defaults for algorithm.
+% If Filename 
+% - is not provided, defaults are loaded for odontocete.xml
+% - is present:
+%    Try to read parameters from specified filename.  When the file is
+%       not an absolute path, read will be relative to the current
+%       working directory.
+%    If this fails, we try to read relative to Silbido's src/matlab/lib
+%       directory.
+%      
+% For an example parameter file, see src/matlab/lib/odontocete.xml
 
-% Settable Thresholds --------------------------------------------------
-thr.whistle_dB = 10;       % SNR criterion for whistles
-thr.click_dB = 10;         % SNR criterion for clicks (part of click skipping decision)
 
-% Whistles whose duration is shorter than threshold will be discarded.
-thr.minlen_ms = 150;
+if nargin < 1
+    Filename = relativetolib('odontocete.xml');
+end
 
-% Maximum gap in energy to bridge when looking for a tonal
-thr.maxgap_ms = 50;
+try
+    xml = tinyxml2_wrap('load', Filename);
+catch e
+    libFilename = relativetolib(Filename);
+    if strcmp(libFilename, Filename)
+        % Rethrow the error if we'd try to read the same file again
+        rethrow(e)
+    else        
+        xml = tinyxml2_wrap('load', libFilename);
+    end
+end
 
-% Maximum difference in frequency to bridge when looking for a tonal
-thr.maxslope_Hz_per_ms = 1000;
+thr = xml.params;
 
-% define frequency range over which we search for tonals
-thr.high_cutoff_Hz = 50000;
-thr.low_cutoff_Hz = 5000;
+function fullpath = relativetolib(filename)
+% Find lib directory and look there
+currdir = fileparts(which(mfilename)); % current directory
+srcdir = fileparts(currdir);  % parent
+fullpath = fullfile(fullfile(srcdir, 'lib'), filename);
 
-thr.activeset_s = .050; % peaks with earliest time > thr.activeset_s will be
-                        % part of active_set otherwise part of orphan set
-
-thr.slope_s = .008;    % Possible predecessor that is thr.slope_s seconds
-                       % behind the current peak (Slope)
-
-thr.phase_s = .008;    % Possible predecessor that is thr.phase_s seconds
-                       % behind the current peak (Phase)
-                       
-% Frames containing broadband signals will be ignored.
-% If more than broadand% of the bins exceed the threshold,
-% we consider the frame a click.  
-%thr.broadband = .20;
-thr.broadband = .01;
-
-% When extracting tonals from a subgraph, use up to thr.disambiguate_s
-% when computing the local polynomial fit.
-thr.disambiguate_s = .3;
-
-% framing parameters
-thr.advance_ms = 2;
-thr.length_ms = 8;
-
-% Data processed in N s blocks
-thr.blocklen_s = 3;

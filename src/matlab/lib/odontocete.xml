@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<silbido>
+    <params>
+        
+        <!-- Time/frequency distribution (discrete Fourier transform) parameters -->
+        <advance_ms type="double">2</advance_ms>
+        <length_ms  type="double">8</length_ms>
+        
+        <!-- Frequency analysis criteria -->
+        <maxslope_Hz_per_ms  type="double">1000</maxslope_Hz_per_ms>  <!-- maximum slope when extending a tonal -->
+        <low_cutoff_Hz  type="double">5000</low_cutoff_Hz>
+        <high_cutoff_Hz  type="double">50000</high_cutoff_Hz>
+        
+        <!-- Energy criteria -->
+        <whistle_dB  type="double">10</whistle_dB>  <!-- Whistle SNR criterion -->
+        
+        <!-- Duration criteria -->
+        <minlen_ms  type="double">150</minlen_ms> <!-- Minimum whistle duration -->
+        <maxgap_ms  type="double">50</maxgap_ms>  <!-- Maximum gap in energy to bridge when looking for a tonal -->
+        <activeset_s  type="double">.050</activeset_s>  <!-- Peaks must be part of a graph with this duration 
+                                              to be promoted to the active set -->
+        <blocklen_s  type="double">3</blocklen_s>  <!-- Process blocks of duration x -->
+        
+        <!-- Echolocation click pruning criteria -->
+        <click_dB  type="double">10</click_dB> <!-- Click SNR criterion (used to skip echolocation clicks) -->
+        <broadband  type="double">.01</broadband>  <!-- When peak count increases by more than this ratio, 
+                                         we assume that a broadband event such as a click has
+                                         occurred and skip the frame. -->
+        
+        
+        <!-- Graph parameters -->
+        <disambiguate_s  type="double">.3</disambiguate_s>   <!-- Use preceding N s for polynomial fit when
+                                                   disambiguating a graph -->
+        
+        
+    </params>
+</silbido>

@@ -11,7 +11,7 @@ function params = dtParseParameterSet(varargin)
 
 
 ParameterSetIdx = [];
-ParameterSet = 'odontocete';  % default
+ParameterSet = 'odontocete.xml';  % default
 
 if length(varargin) > 0
     % Find last index of ParameterSet string
@@ -24,9 +24,7 @@ if ~ isempty(ParameterSetIdx)
 end
 if ischar(ParameterSet)
     % Named set, retrieve it.
-    % FIXME
-    params = dtThresh();
-    %params = dtThresh(ParameterSet);
+    params = dtThresh(ParameterSet);
 elseif isstruct(ParameterSet)
     % Caller passed in a structure, return it and hope
     % they knew what they were doing...

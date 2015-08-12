@@ -51,6 +51,10 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
+% Filename is expected in the first varargin
+Filename = varargin{1};
+varargin(1) = [];  % remove
+
 % Settable Parameters --------------------------------------------------
 % The threshold set is processed before any other argument as other
 % arguments override the parameter set.
@@ -66,7 +70,6 @@ data.scale = 1000; % kHz
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Filename Handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Filename = varargin{1};
 if isempty(Filename)
     [Filename, FileDir] = uigetfile('.wav', 'Develop ground truth for file');
     if isnumeric(Filename)
@@ -92,7 +95,7 @@ data.RemovalMethod = '';
 
 % This is a work around so we get access to the actual parameters
 % we will use for signal processing.
-tt = TonalTracker(data.Filename, 0, data.Stop_s);
+tt = TonalTracker(data.Filename, 0, data.Stop_s, 'ParameterSet', data.thr);
 data.tt = tt;
 
 %calculate_block_starts(tt.thr.blocklen_s)
@@ -109,7 +112,7 @@ data.noiseBoundaries = [];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % processs arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-k = 2;
+k = 1;
 while k <= length(varargin)
     switch varargin{k}
         case 'ViewStart'
@@ -121,6 +124,8 @@ while k <= length(varargin)
         case 'NoiseBoundaries'
             data.noiseBoundaries = varargin{k+1};
             k=k+2;
+        case 'ParameterSet'
+            k=k+2;  % already handled
         otherwise
             error('Unknown paramters %s', varargin{k});
     end
