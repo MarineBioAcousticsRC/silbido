@@ -7,7 +7,7 @@
         <length_ms  type="double">8</length_ms>
         
         <!-- Frequency analysis criteria -->
-        <maxslope_Hz_per_ms  type="double">1000</maxslope_Hz_per_ms>  <!-- maximum slope when extending a tonal -->
+        <maxgap_Hz  type="double">1000</maxgap_Hz>  <!-- maximum gap between predicition and peak -->
         <low_cutoff_Hz  type="double">5000</low_cutoff_Hz>
         <high_cutoff_Hz  type="double">50000</high_cutoff_Hz>
         
