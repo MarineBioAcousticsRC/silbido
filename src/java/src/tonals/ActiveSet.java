@@ -211,13 +211,15 @@ public class ActiveSet {
 			double activeset_thr_s) {
 		//System.out.println(String.format("Ridge with %d nodes being added at (%f, %f).", times.length, times[0], freqs[0]));
 		
+		double predict_lookback_s = 0.025;
+		
 		tfnode firstNode = tfnode.create(times[0], freqs[0], dBs[0], angles[0], true);
 		
 		tfTreeSet set = new tfTreeSet();
 		set.add(firstNode);
 		
-		extend_aux(set, maxgap_Hz, activeSet, true);
-		extend_aux(set, maxgap_Hz, orphans, false);
+		extend_aux(set, maxgap_Hz, predict_lookback_s, activeSet, true);
+		extend_aux(set, maxgap_Hz, predict_lookback_s, orphans, false);
 		
 		tfnode lastNode = firstNode;
 		for (int i = 1; i < times.length; i++) {
@@ -238,7 +240,21 @@ public class ActiveSet {
 		this.ridgeFrontier.add(firstNode);
 	}
 	
-	public void extend(tfTreeSet peaks, double maxgap_Hz, double activeset_thr_s) {
+	/**
+	 * Extend the current active and orphan sets of graphs 
+	 * peaks - Graphs may be extended to include these peaks 
+	 * maxgap_Hz - Extend to peaks that lie within this many Hz
+	 *    of the predicted graph path.
+	 * predict_lookback_s - Use previous N s to predict possible peaks
+	 *    along the graph
+	 * activeset_thr_s - Active set nodes whose latest peaks are more than
+	 *    N s away from the time of the current set of peaks will not
+	 *    be considered.  When an active set graph has no peaks that satisfy
+	 *    this criterion, the grah is closed off and analyzed for tonals.
+	 */
+	public void extend(tfTreeSet peaks, double maxgap_Hz, 
+			double predict_lookback_s, 
+			double activeset_thr_s) {
 		tfTreeSet newRidgeFronteier = new tfTreeSet();
 		
 		double time = peaks.first().time;
@@ -269,9 +285,9 @@ public class ActiveSet {
 		}
 		
 		// Attempt to join new peaks to existing structure
-		extend_aux(peaks, maxgap_Hz, activeSet, true);
+		extend_aux(peaks, maxgap_Hz, predict_lookback_s, activeSet, true);
 		if (this.ridgeFrontier.size() > 0) {
-			extend_aux(this.ridgeFrontier, maxgap_Hz, activeSet, true);
+			extend_aux(this.ridgeFrontier, maxgap_Hz, predict_lookback_s, activeSet, true);
 		}
 
 		// orphans are short segments and may be spurious.
@@ -284,7 +300,7 @@ public class ActiveSet {
 		if (DEBUGGING) {
 			System.out.println("Extending orphans");
 		}
-		extend_aux(peaks, maxgap_Hz, orphans, false);
+		extend_aux(peaks, maxgap_Hz, predict_lookback_s, orphans, false);
 		
 		// Determine where to put the new peaks
 		for (tfnode p : peaks) {
@@ -312,6 +328,7 @@ public class ActiveSet {
 	}
 
 	private void extend_aux(tfTreeSet peaks, double maxgap_Hz,
+			double predict_lookback_s, 
 			Collection<tfnode> open, boolean joinExisting) {
 		
 		if (peaks.size() < 1) {
@@ -356,7 +373,7 @@ public class ActiveSet {
 
 				if (inrange) {
 					// Determine time x freq trajectories into activenode
-					active_fits = getFitsForNode(activenode, 0.025);
+					active_fits = getFitsForNode(activenode, predict_lookback_s);
 				} else {
 					active_fits = null;
 				}

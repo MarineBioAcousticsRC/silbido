@@ -402,7 +402,7 @@ classdef TonalTracker < handle
                
                % Link anything possible from the current active set to the
                % new peaks then add them to the active set.            
-               tt.active_set.extend(peak_list, tt.thr.maxgap_Hz, tt.thr.activeset_s);
+               tt.active_set.extend(peak_list, tt.thr.maxgap_Hz, tt.thr.tt.thr.activeset_s);
                if (tt.callbackSet)
                    tt.SPCallback.handleActiveSetExtension(tt);
                end
