@@ -1,4 +1,4 @@
-function output_txt = datatip_tfnode(obj,event_obj)
+function output_txt = dtTFNodeDatatip(obj,event_obj)
 % Display the position of the data cursor
 % obj          Currently not used (empty)
 % event_obj    Handle to event object
