@@ -31,9 +31,9 @@
         <!-- Graph parameters -->
         <!-- Use up to preceding N s for polynomial fit when predicting whether or not a peak
             should be added to the current frontier sets (active set + orphan set) -->
-        <predict_lookback_s>.025</predict_lookback_s>
+        <predict_lookback_s type="double">.025</predict_lookback_s>
         <!-- Use preceding N s for polynomial fit when disambiguating a graph -->
-        <disambiguate_s  type="double">.3</disambiguate_s>   
+        <disambiguate_s type="double">.3</disambiguate_s>   
         
         
     </params>
