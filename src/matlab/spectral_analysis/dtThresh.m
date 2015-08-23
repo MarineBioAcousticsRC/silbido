@@ -17,15 +17,18 @@ if nargin < 1
     Filename = relativetolib('odontocete.xml');
 end
 
-try
+if fexist(Filename)
     xml = tinyxml2_wrap('load', Filename);
-catch e
+else
     libFilename = relativetolib(Filename);
     if strcmp(libFilename, Filename)
         % Rethrow the error if we'd try to read the same file again
-        rethrow(e)
-    else        
-        xml = tinyxml2_wrap('load', libFilename);
+        error('Cannot find file %s', Filename);
+    else if fexist(libFilename)
+            xml = tinyxml2_wrap('load', libFilename);
+        else
+            error('Cannot find file %s', Filename);
+        end         
     end
 end
 
@@ -37,3 +40,15 @@ currdir = fileparts(which(mfilename)); % current directory
 srcdir = fileparts(currdir);  % parent
 fullpath = fullfile(fullfile(srcdir, 'lib'), filename);
 
+function exists = fexist(filename)
+% exists = fexist(filename)
+% Check if file exists.
+% We don't use Matlab's built in exist as it checks for anything
+% on the Matlab path.
+
+% pretty inefficient, but wont' be called often...
+h = fopen(filename, 'rb');
+exists = h ~= -1;
+if exists
+    fclose(h);
+end
