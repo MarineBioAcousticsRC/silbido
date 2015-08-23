@@ -93,6 +93,8 @@ guidata(hObject, handles);
 % arguments override the parameter set.
 data.thr = dtParseParameterSet(varargin{:});  % retrieve parameters
 
+data.annotations = java.util.LinkedList(); % empty list of annotations
+
 % Defaults
 data.NoiseMethod = {'median'};
 % spectrogram colors
@@ -272,7 +274,6 @@ data.Start_s = 0;
 data.Stop_s = data.hdr.Chunks{data.hdr.dataChunk}.nSamples/data.hdr.fs;
 data.RemoveTransients = false;
 
-data.annotations = java.util.LinkedList(); % empty list of annotations
 
 data.operation = [];
 

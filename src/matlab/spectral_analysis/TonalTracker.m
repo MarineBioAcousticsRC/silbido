@@ -64,8 +64,10 @@ classdef TonalTracker < handle
 
             % Settable Thresholds --------------------------------------------------
             % Handle ParameterSet first as other things may override it.
-            
-            tt.thr = dtParseParameterSet(varargin{:});  % retrieve parameters
+            % provided that this not an SPCallback
+            if ~strcmp(varargin{1}, 'SPCallback')
+                tt.thr = dtParseParameterSet(varargin{:});  % retrieve parameters
+            end
 
             % Other defaults ------------------------------------------------------
             tt.NoiseSub = 'median';          % what type of noise compensation

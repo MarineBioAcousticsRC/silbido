@@ -12,7 +12,7 @@
         <high_cutoff_Hz  type="double">6500</high_cutoff_Hz>
         
         <!-- Energy criteria -->
-        <whistle_dB  type="double">5</whistle_dB>  <!-- Whistle SNR criterion -->
+        <whistle_dB  type="double">2</whistle_dB>  <!-- Whistle SNR criterion -->
         
         <!-- Duration criteria -->
         <minlen_ms  type="double">200</minlen_ms> <!-- Minimum whistle duration -->
