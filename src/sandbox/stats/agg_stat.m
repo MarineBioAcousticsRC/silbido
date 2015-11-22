@@ -10,7 +10,7 @@ detections_base = '/Users/michael/development/silbido/silbido-hg-repo/src/sandbo
 
 
 % These return one stat per tonal
-stat_func = @(tonal, graph) stat_avg_nth_wait_times(tonal,3); % has potential
+%stat_func = @(tonal, graph) stat_avg_nth_wait_times(tonal,3); % has potential
 %stat_func = @stat_tonal_length;
 %stat_func = @stat_cumm_power_over_time;
 %stat_func = @stat_avg_peak_power;
@@ -38,8 +38,7 @@ stat_func = @(tonal, graph) stat_avg_nth_wait_times(tonal,3); % has potential
 
 
 %stat_func = @stat_graph_nodes_per_area;
-%stat_func = @stat_graph_nodes_per_second; %has potential after graps
-%pruned
+%stat_func = @stat_graph_nodes_per_second;
 
 
 [gd_stats, fp_stats] = calculate_tonal_stats(detections_base, stat_func);

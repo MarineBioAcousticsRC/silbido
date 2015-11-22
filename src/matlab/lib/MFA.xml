@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<silbido>
+    <params>
+        
+        <!-- Time/frequency distribution (discrete Fourier transform) parameters -->
+        <advance_ms type="double">5</advance_ms>
+        <length_ms  type="double">10</length_ms>
+        
+        <!-- Frequency analysis criteria -->
+        <maxgap_Hz  type="double">150</maxgap_Hz>  <!-- maximum gap between predicition and peak -->
+        <low_cutoff_Hz  type="double">2000</low_cutoff_Hz>
+        <high_cutoff_Hz  type="double">6500</high_cutoff_Hz>
+        
+        <!-- Energy criteria -->
+        <whistle_dB  type="double">2</whistle_dB>  <!-- Whistle SNR criterion -->
+        
+        <!-- Duration criteria -->
+        <minlen_ms  type="double">200</minlen_ms> <!-- Minimum whistle duration -->
+        <maxgap_ms  type="double">20</maxgap_ms>  <!-- Maximum gap in energy to bridge when looking for a tonal -->
+        <activeset_s  type="double">.2</activeset_s>  <!-- Peaks must be part of a graph with this duration 
+                                              to be promoted to the active set -->
+        <blocklen_s  type="double">15</blocklen_s>  <!-- Process blocks of duration x -->
+        
+        <!-- Echolocation click pruning criteria -->
+        <click_dB  type="double">10</click_dB> <!-- Click SNR criterion (used to skip echolocation clicks) -->
+        <broadband  type="double">.1</broadband>  <!-- When peak count increases by more than this ratio, 
+                                         we assume that a broadband event such as a click has
+                                         occurred and skip the frame. -->
+        
+        
+        <!-- Graph parameters -->
+        <!-- Use up to preceding N s for polynomial fit when predicting whether or not a peak
+            should be added to the current frontier sets (active set + orphan set) -->
+        <predict_lookback_s type="double">.1</predict_lookback_s>
+        <!-- Use preceding N s for polynomial fit when disambiguating a graph -->         
+        <disambiguate_s type="double">.2</disambiguate_s>   <!-- Use preceding N s for polynomial fit when
+                                                   disambiguating a graph -->
+        
+        
+    </params>
+</silbido>

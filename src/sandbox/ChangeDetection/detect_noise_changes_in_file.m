@@ -1,5 +1,5 @@
 function changes = detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS, varargin)
-% detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS, varargin)
+% trkCettolo(SourceData, varargin)
 %
 % Optional arguments:
 % 'DeltaMS', {Low, High}

@@ -21,8 +21,8 @@ global PARAMS
 hdr = init_ltsaparams(PARAMS);
 
 % Populate base directory and LTSA filename
-[hdr.ltsa.inpath, fname, ext, ver] = fileparts(Filename);
-hdr.ltsa.infile = [fname, ext, ver];
+[hdr.ltsa.inpath, fname, ext] = fileparts(Filename);
+hdr.ltsa.infile = [fname, ext];
 
 hdr.ltsa.ver = fread(fid,1,'uint8');           % 1 byte - version number
 ver = ioVersionInfoLTSA(hdr.ltsa.ver);  % Retrieve LTSA version

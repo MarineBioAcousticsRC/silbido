@@ -1,1 +1,0 @@
-SilbidoDebugUI('Filename', '/Users/michael/development/silbido/corpora/paper_files/bottlenose/Qx-Tt-SCI0608-N1-060814-121518.wav', 'ViewStart', 19.7);

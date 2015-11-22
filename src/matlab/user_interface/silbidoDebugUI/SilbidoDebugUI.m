@@ -1,18 +1,6 @@
 function varargout = SilbidoDebugUI(varargin)
+% SilbidoDebugUI(AudioFilename, OptionalArguments)
 % Whistle/Tonal trackingdebug tool
-% Optional arguments in any order:
-%   'Filename'
-%       The file name of the file to open.
-%   'ViewStart'
-%       The location in the file (in seconds) to
-%       start the debug view at.
-%   'ViewLength'
-%       The length (in seconds) to initially render in
-%       the debugge.
-%   'NoiseBoundaries'
-%       The noise boundaries to use.  If none are supplied
-%       standard 3 second blocks will be used.
-
 
 % Note:
 % This function requires SilbidoDebugUI.fig to be present and uses
@@ -63,6 +51,10 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
+% Filename is expected in the first varargin
+Filename = varargin{1};
+varargin(1) = [];  % remove
+
 % Settable Parameters --------------------------------------------------
 % The threshold set is processed before any other argument as other
 % arguments override the parameter set.
@@ -74,40 +66,11 @@ data.NoiseMethod = {'median'};
 data.SpecgramColormap = bone();
 data.scale = 1000; % kHz
 
-data.noiseBoundaries = [];
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% processs arguments
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Defaults
-viewStartSeconds = 0;
-viewLengthSeconds = 10;
-k = 1;
-while k <= length(varargin)
-    switch varargin{k}
-        case 'Filename'
-            Filename = varargin{k+1};
-            k=k+2;
-        case 'ViewStart'
-            viewStartSeconds = varargin{k+1};
-            k=k+2;
-        case 'ViewLength'
-            viewLengthSeconds = varargin{k+1};
-            k=k+2;
-        case 'NoiseBoundaries'
-            data.noiseBoundaries = varargin{k+1};
-            k=k+2;
-        otherwise
-            error('Unknown paramters %s', varargin{k});
-    end
-end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Filename Handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if ~exist('Filename', 'var') || isempty(Filename)
+if isempty(Filename)
     [Filename, FileDir] = uigetfile('.wav', 'Develop ground truth for file');
     if isnumeric(Filename)
         fprintf('User abort\n');
@@ -132,7 +95,7 @@ data.RemovalMethod = '';
 
 % This is a work around so we get access to the actual parameters
 % we will use for signal processing.
-tt = TonalTracker(data.Filename, 0, data.Stop_s);
+tt = TonalTracker(data.Filename, 0, data.Stop_s, 'ParameterSet', data.thr);
 data.tt = tt;
 
 %calculate_block_starts(tt.thr.blocklen_s)
@@ -144,6 +107,29 @@ data.FigureTitle = '';
 data.ms_per_s = 1000;
 data.thr.advance_s = data.thr.advance_ms / data.ms_per_s;
 
+data.noiseBoundaries = [];
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% processs arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+k = 1;
+while k <= length(varargin)
+    switch varargin{k}
+        case 'ViewStart'
+            viewStartSeconds = varargin{k+1};
+            k=k+2;
+        case 'ViewLength'
+            viewLengthSeconds = varargin{k+1};
+            k=k+2;
+        case 'NoiseBoundaries'
+            data.noiseBoundaries = varargin{k+1};
+            k=k+2;
+        case 'ParameterSet'
+            k=k+2;  % already handled
+        otherwise
+            error('Unknown paramters %s', varargin{k});
+    end
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Variables

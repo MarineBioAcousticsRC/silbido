@@ -17,7 +17,6 @@ end
 
 minv = Inf;
 maxv = -Inf;
-updated = false;
 for hidx = 1: length(ImageH)
     
     % Get the original structure associated with image
@@ -38,11 +37,10 @@ for hidx = 1: length(ImageH)
         set(ImageH(hidx), 'UserData', pwr_brt_cont);
         minv = min(minv, min(min(colorData)));
         maxv = max(maxv, max(max(colorData)));
-        updated = true;
     end
 end
 
-if ~ isempty(colorbarH) && updated
+if ~ isempty(colorbarH)
     if maxv - minv < 6
         minv = minv - 3;
         maxv = maxv + 3;

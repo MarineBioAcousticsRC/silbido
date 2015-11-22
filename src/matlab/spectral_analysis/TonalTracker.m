@@ -59,48 +59,15 @@ classdef TonalTracker < handle
             
             tt.Start_s = Start_s;
             
-            tt.thr = struct();
-
+ 
             ActiveSet.setDebugging(false);
 
             % Settable Thresholds --------------------------------------------------
-            tt.thr.whistle_dB = 10;       % SNR criterion for whistles
-            tt.thr.click_dB = 10;         % SNR criterion for clicks (part of click skipping decision)
-
-            % Whistles whose duration is shorter than threshold will be discarded.
-            tt.thr.minlen_ms = 150;
-
-            % Maximum gap in time to bridge when looking for a tonal
-            tt.thr.maxgap_ms = 50;
-
-            % Maximum difference in frequency to bridge when looking for a tonal
-            tt.thr.maxslope_Hz_per_ms = 1000;
-
-            % define frequency range over which we search for tonals
-            tt.thr.high_cutoff_Hz = 50000;
-            tt.thr.low_cutoff_Hz = 5000;
-
-            tt.thr.activeset_s = .050; % peaks with earliest time > thr.activeset_s will be
-                                    % part of active_set otherwise part of orphan set
-
-            tt.thr.slope_s = .008;    % Possible predecessor that is thr.slope_s seconds
-                                   % behind the current peak (Slope)
-
-            tt.thr.phase_s = .008;    % Possible predecessor that is thr.phase_s seconds
-                                   % behind the current peak (Phase)
-
-            % Frames containing broadband signals will be ignored.
-            % If more than broadand% of the bins exceed the threshold,
-            % we consider the frame a click.  
-            %thr.broadband = .20;
-            tt.thr.broadband = .01;
-
-            % When extracting tonals from a subgraph, use up to thr.disambiguate_s
-            % when computing the local polynomial fit.
-            tt.thr.disambiguate_s = .3;  
-            tt.thr.advance_ms = 2;
-            tt.thr.length_ms = 8;
-            tt.thr.blocklen_s = 3;
+            % Handle ParameterSet first as other things may override it.
+            % provided that this not an SPCallback
+            if ~strcmp(varargin{1}, 'SPCallback')
+                tt.thr = dtParseParameterSet(varargin{:});  % retrieve parameters
+            end
 
             % Other defaults ------------------------------------------------------
             tt.NoiseSub = 'median';          % what type of noise compensation
@@ -140,6 +107,7 @@ classdef TonalTracker < handle
                         k=k+2;
                     case 'SPCallback'
                         tt.SPCallback = varargin{k+1}; k=k+2;
+                        tt.thr = tt.SPCallback.thr;  % Override defaults
                         tt.callbackSet = true;
                     case 'RemoveTransients'
                         tt.removeTransients = varargin{k+1}; k=k+2;
@@ -436,7 +404,8 @@ classdef TonalTracker < handle
                
                % Link anything possible from the current active set to the
                % new peaks then add them to the active set.            
-               tt.active_set.extend(peak_list, tt.thr.maxslope_Hz_per_ms, tt.thr.activeset_s);
+               tt.active_set.extend(peak_list, tt.thr.maxgap_Hz, ...
+                   tt.thr.predict_lookback_s, tt.thr.activeset_s);
                if (tt.callbackSet)
                    tt.SPCallback.handleActiveSetExtension(tt);
                end
@@ -566,9 +535,10 @@ classdef TonalTracker < handle
                 while segIt.hasNext()
                     edge = segIt.next();
                     tone = edge.content;
-                    if tone.get_duration() > tt.thr.minlen_s && stat_avg_nth_wait_times(tone,3) < 18
+                    if tone.get_duration() > tt.thr.minlen_s
+                        %if (stat_avg_nth_wait_times(tone,3) < 18)
                           tonals.addLast(tone);
-                        
+                        %end
                     else
                         tt.discarded_count = tt.discarded_count + 1;
                     end

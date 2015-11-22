@@ -109,7 +109,7 @@ classdef DebugRenderingManager < handle
           cb.new_peak_handles = plot(cb.handles.spectrogram,...
               current_time(ones(size(peaks))),...
               peaks/1000, ...
-              'r^', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
+              'r^');
           cb.progress_handles(end+1) = ...
               plot(cb.handles.progressAxes, ...
                   [current_time current_time], ...
@@ -282,8 +282,8 @@ classdef DebugRenderingManager < handle
                   
                  
                   % Plot the vertical line of the range.
-                  upper_limit = freqs(end) + tt.thr.maxslope_Hz_per_ms;
-                  lower_limit = max(0, freqs(end) - tt.thr.maxslope_Hz_per_ms);
+                  upper_limit = freqs(end) + tt.thr.maxgap_Hz;
+                  lower_limit = max(0, freqs(end) - tt.thr.maxgap_Hz);
                   
                   range_times = [tt.current_s tt.current_s];
                   range_freqs = [lower_limit upper_limit];
