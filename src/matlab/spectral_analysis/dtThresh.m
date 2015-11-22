@@ -42,13 +42,26 @@ fullpath = fullfile(fullfile(srcdir, 'lib'), filename);
 
 function exists = fexist(filename)
 % exists = fexist(filename)
-% Check if file exists.
-% We don't use Matlab's built in exist as it checks for anything
-% on the Matlab path.
+% Check if file exists.  
 
-% pretty inefficient, but wont' be called often...
-h = fopen(filename, 'rb');
-exists = h ~= -1;
-if exists
-    fclose(h);
+% We cannot check using Matlab's exist as it will look along the Matlab 
+% path and the XML loader will assume a proper path to the file without
+% reference to Matlab's path.
+
+% Determine if this is an absolute filepath
+%  Check for 
+%   DriveLetter:\           C:\   Windows path
+%   DriveLetter:/           C:/   Windows path
+%   \\path                  Windows Universal Naming Convention (UNC)
+%   .\path                  Windows relative to current working directory
+%   ./path                  UNIX relative to current working directory
+%   /path                   UNIX absolute path
+abspath = regexp(filename, ...
+    '^([A-Za-z]\:[\\/]|\\\\[A-Za-z]|/|\.[/\\])', 'ONCE');
+
+if isempty(abspath)
+    % Convert to an absolute path
+    filename = sprintf('.%s%s', filesep, filename);
 end
+   
+exists = exist(filename, 'file');  
