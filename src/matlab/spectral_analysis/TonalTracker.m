@@ -65,7 +65,7 @@ classdef TonalTracker < handle
             % Settable Thresholds --------------------------------------------------
             % Handle ParameterSet first as other things may override it.
             % provided that this not an SPCallback
-            if ~strcmp(varargin{1}, 'SPCallback')
+            if length(varargin) == 0 || ~strcmp(varargin{1}, 'SPCallback')
                 tt.thr = dtParseParameterSet(varargin{:});  % retrieve parameters
             end
 
