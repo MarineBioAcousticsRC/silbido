@@ -11,7 +11,7 @@ if (start_s < blockBoundaries(1,1))
         'start_s must be >= to the first block boundary');
     throw(err);
 end
-    
+
 if (end_s > blockBoundaries(end,2))
     err = MException('ResultChk:OutOfRange', ...
         'end_s must be <= to the last block boundary');
