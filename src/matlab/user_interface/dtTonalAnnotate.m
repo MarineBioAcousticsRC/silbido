@@ -44,7 +44,7 @@ function varargout = dtTonalAnnotate(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 01-Dec-2013 15:41:45
+% Last Modified by GUIDE v2.5 03-Apr-2016 23:06:53
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -227,9 +227,9 @@ while k <= length(varargin)
         otherwise
             try
                 if isnumeric(varargin{k})
-                    errstr = sprintf('Bad option %f', varargin{k});
+                    errstr = sprintf('Bad option: %f', varargin{k});
                 else
-                    errstr = sprintf('Bad option %s', char(varargin{k}));
+                    errstr = sprintf('Bad option: %s', char(varargin{k}));
                 end
             catch e
                 errstr = sprintf('Bad optional arg position %d', k);
@@ -240,6 +240,8 @@ end
 
 
 % TODO Abstract this.
+% Values for 'Mode' must be 'annotate' or 'analyze'
+% Return an error if otherwise.
 if (strcmp(data.Mode, 'annotate') == 1)
     if isempty(Filename)
         [Filename, FileDir] = uigetfile('.wav', 'Develop ground truth for file');
@@ -255,15 +257,23 @@ if (strcmp(data.Mode, 'annotate') == 1)
     else
         data.Filename = Filename;
     end
-else        
+elseif (strcmp(data.Mode, 'analyze') == 1)      
     if (isempty(data.RelativeFilePath))
         [accepted, corupus_rel_path] = corpus_file_chooser(data.CorpusBaseDir);
         if (accepted)
             data.RelativeFilePath = corupus_rel_path;
         end
     end
-    
     data.Filename = fullfile(data.CorpusBaseDir, data.RelativeFilePath);
+    set(handles.annotationsCombo,'Enable','On');
+    set(handles.allTonalsRadio,'Enable','On');
+    set(handles.snrTonalsRadio,'Enable','On');
+    set(handles.uipanel4, 'Title', 'Scored Annotations');
+    %TODO: Initialize scored tonals to be displayed on opening.
+    %updateDisplayedAnnotations(handles.annotationsCombo, eventdata, handles);
+else
+    errstr = sprintf('Invalid Value: %s', data.Mode);
+    error('%s', errstr);
 end
 
 
@@ -556,7 +566,7 @@ if ~ isempty(new_tonal)
     % Remove original tonal from list of rendered
     % tonals and insert new one
     handles.Rendered = setdiff(handles.Rendered, handles.Editing);
-    [handles.Rendered(end+1), data] = plot_tonal(change.after{1}, handles, data);
+    [handles.Rendered(end+1), ~, data] = plot_tonal(change.after{1}, handles, data);
     delete(handles.Editing);
     handles = exitEditMode(handles);
     % save changes
@@ -2829,7 +2839,13 @@ switch(comboValue)
         fileName = data.resultAnnotations.d_minus;
         
     case 4 % All Ground Truth
-        fileName = data.resultAnnotations.bin;
+        % Look for .ann annotation file first. If not found,
+        % attempt to load .bin annotation file.
+        if (exist(data.resultAnnotations.ann,'file'))
+            fileName = data.resultAnnotations.ann;
+        else
+            fileName = data.resultAnnotations.bin;
+        end
         
     case 5 % Detected Ground Truth
         if (allTonals > 0)
@@ -2878,7 +2894,8 @@ function [UserData] = process_scored_detections_dir(UserData, scoredFolder)
     basefile = fullfile(scoredFolder,name);
 
     resultAnnotations = struct();
-    resultAnnotations.bin =       [path '/' name '.bin']; % All detections;
+    resultAnnotations.ann =       [path '/' name '.ann']; % All ground truths (.ann file);
+    resultAnnotations.bin =       [path '/' name '.bin']; % All ground truths (.bin file);
     resultAnnotations.det =       [basefile '.det'];      % All detections;
     resultAnnotations.d_minus =   [basefile '.d-'];       % False posative
     
@@ -2895,7 +2912,7 @@ function [UserData] = process_scored_detections_dir(UserData, scoredFolder)
     graphs_file = [basefile '.graph'];
     
     import tonals.*;
-    UserData.all_graphs = tonals.GraphIO.loadGraphs(graphs_file);
+    %UserData.all_graphs = tonals.GraphIO.loadGraphs(graphs_file);
 
 
     % --------------------------------------------------------------------
@@ -3109,3 +3126,34 @@ function statsButton_Callback(hObject, eventdata, handles)
 % hObject    handle to statsButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes during object deletion, before destroying properties.
+function operation_DeleteFcn(hObject, eventdata, handles)
+% hObject    handle to operation (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes during object deletion, before destroying properties.
+function annotationsCombo_DeleteFcn(hObject, eventdata, handles)
+% hObject    handle to annotationsCombo (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- If Enable == 'on', executes on mouse press in 5 pixel border.
+% --- Otherwise, executes on mouse press in 5 pixel border or over operation.
+function operation_ButtonDownFcn(hObject, eventdata, handles)
+% hObject    handle to operation (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in allTonalsRadio.
+function allTonalsRadio_Callback(hObject, eventdata, handles)
+% hObject    handle to allTonalsRadio (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of allTonalsRadio

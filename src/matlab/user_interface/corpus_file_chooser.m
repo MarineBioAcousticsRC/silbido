@@ -5,45 +5,28 @@ function [accepted, selectedPath] = corpus_file_chooser(corpus_base)
     accepted = 0;
     selectedPath = '';
     
-    f = figure('WindowStyle', 'modal', 'name', 'Select Audio File', 'NumberTitle','off');
+    f = figure('WindowStyle', 'normal', 'name', 'Select Audio File', 'NumberTitle','off');
     pos = get(f, 'Position');
     
     %treePanel = uipanel('Title','Main Panel','FontSize',12,...
     %         'BackgroundColor','white',...
     %         'Position',[0 .33 1 .67]);
     
-    root = uitreenode('v0', corpus_base, 'Corups Root', [], false);
+    root = uitreenode('v0', corpus_base, 'Corpus Root', [], false);
     [tree, container] = uitree('v0', 'Root', root, 'ExpandFcn', @myExpfcn, ...
                 'SelectionChangeFcn', @selectionCallBack);
     
     % MousePressedCallback is not supported by the uitree, but by jtree
     jtree = handle(tree.getTree,'CallbackProperties');
     set(jtree, 'MousePressedCallback', @mousePressedCallback);
-    function mousePressedCallback(hTree, eventData) %,additionalVar)
-        if eventData.getClickCount==2 % how to detect double clicks
-            if (isSelectionAudioFile())
-                okCallback();
-            end
-        end
-    end
-
-    function result = isSelectionAudioFile() 
-        nodes = tree.SelectedNodes;
-        result = 0;
-        if isempty(nodes)
-            return;
-        end
-
-        node = nodes(1);
-        if (~node.getAllowsChildren())
-            result = 1;
-        end
-    end
+    
 
     % left, bottom, width, height
-    buttonPanelPos = [0, 0, pos(3), 50];
-    height = pos(4) - buttonPanelPos(4);
-    tree.Position = [0,buttonPanelPos(4),pos(3),height];
+    %Note: uipanel's position values are normalized by default
+    %from 0-1.
+    buttonPanelPos = [0,0,1,.1];
+    height = pos(4) - 50;
+    tree.Position = [0,50,pos(3),height];
     
     buttonPanel = uipanel('Position', buttonPanelPos);
     buttonWidth = 50;
@@ -65,6 +48,27 @@ function [accepted, selectedPath] = corpus_file_chooser(corpus_base)
      
     waitfor(f);
             
+    function mousePressedCallback(hTree, eventData) %,additionalVar)
+        if eventData.getClickCount==2 % how to detect double clicks
+            if (isSelectionAudioFile())
+                okCallback();
+            end
+        end
+    end
+
+    function result = isSelectionAudioFile() 
+        nodes = tree.SelectedNodes;
+        result = 0;
+        if isempty(nodes)
+            return;
+        end
+
+        node = nodes(1);
+        if (~node.getAllowsChildren())
+            result = 1;
+        end
+    end
+
     function okCallback(hObject, eventdata)
         accepted = 1;
         close(f)

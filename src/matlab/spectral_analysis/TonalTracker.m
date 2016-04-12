@@ -65,7 +65,7 @@ classdef TonalTracker < handle
             % Settable Thresholds --------------------------------------------------
             % Handle ParameterSet first as other things may override it.
             % provided that this not an SPCallback
-            if ~strcmp(varargin{1}, 'SPCallback')
+            if length(varargin) == 0 || ~strcmp(varargin{1}, 'SPCallback')
                 tt.thr = dtParseParameterSet(varargin{:});  % retrieve parameters
             end
 
@@ -445,10 +445,7 @@ classdef TonalTracker < handle
         end
         
         function hasNext = hasNextBlock(tt)
-            %hasNext = tt.StartBlock_s + 2 * tt.Length_s < tt.Stop_s;
-            % This is a hack.
-            %hasNext = tt.StartBlock_s + tt.block_padded_s + 2 * tt.Length_s < tt.Stop_s;
-            hasNext = tt.block_idx < length(tt.blocks);
+            hasNext = tt.block_idx < size(tt.blocks,1);
         end
         
         function hasNext = blockHasNextFrame(tt)
