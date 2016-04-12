@@ -45,13 +45,17 @@ elseif ftype == 2               % do the following for xwavs
     hdr.xhd.ChunkSize = fread(fid,1,'uint32');           % File size - 8 bytes
     filesize = getfield(dir(Filename),'bytes');
     if hdr.xhd.ChunkSize ~= filesize - 8
-        disp_msg('Error - incorrect Chunk Size')
+        warning('Error - incorrect Chunk Size %s', Filename)
         %     return    % comment to work with bad files
     end
     hdr.xhd.Format = char(fread(fid,4,'uchar'))';        % "WAVE"
 
     if ~strcmp(hdr.xhd.ChunkID,'RIFF') || ~strcmp(hdr.xhd.Format,'WAVE')
-        disp_msg('not wav file - exit')
+        try
+            disp_msg('not wav file - exit')
+        catch
+            warning('not wav file - exit')
+        end
         return
     end
 
