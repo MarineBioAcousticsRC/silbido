@@ -205,7 +205,7 @@ public class TonalBinaryInputStream {
 	}
 
 	
-	public  void tonalBinaryInputStream(String Filename) throws IOException
+	public TonalBinaryInputStream(String Filename) throws IOException
 	{ 
 		try{
 			filestream = new FileInputStream(Filename);
