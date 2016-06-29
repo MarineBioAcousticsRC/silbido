@@ -45,9 +45,7 @@ end
 [path name ext] = fileparts(Filename);
 if ~strcmp(ext, '.ton')
     % loads binary file
-    tonalBIS = TonalBinaryInputStream;
-    
-    tonalBIS.tonalBinaryInputStream(Filename);    % retrieve linked list
+    tonalBIS = TonalBinaryInputStream(Filename);
     tonalList = tonalBIS.getTonals(); 
     headerInfo = tonalBIS.getHeader();  
 else if strcmp(ext, '.ton')
