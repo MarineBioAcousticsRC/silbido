@@ -1,9 +1,10 @@
-function changes = detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS, varargin)
-% changes = detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS,
+function changes = detect_noise_changes(Filename, StartTimeS, EndTimeS, varargin)
+% changes = detect_noise_changes(Filename, StartTimeS, EndTimeS,
 %                                        OptionalArgs)
 %
 % Find times when the noise regime is likely to have changed as measured
-% by a Bayesian information criterion test.
+% by a Bayesian information criterion test.  Set EndTimeS to Inf to process
+% an entire file.
 % 
 % Returns vector of change times in seconds relative to the start of file.
 %
