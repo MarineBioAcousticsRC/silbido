@@ -1,5 +1,11 @@
 function changes = detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS, varargin)
-% trkCettolo(SourceData, varargin)
+% changes = detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS,
+%                                        OptionalArgs)
+%
+% Find times when the noise regime is likely to have changed as measured
+% by a Bayesian information criterion test.
+% 
+% Returns vector of change times in seconds relative to the start of file.
 %
 % Optional arguments:
 % 'DeltaMS', {Low, High}
@@ -29,12 +35,21 @@ function changes = detect_noise_changes_in_file(Filename, StartTimeS, EndTimeS, 
 % Silbido Spectral Processing Parameters
 %-------------------------------------------------------------------------%
 
+narginchk(1,Inf);
+
 thr.high_cutoff_Hz = 50000;
 thr.low_cutoff_Hz = 5000;
 thr.broadband = .01;
 
 thr.advance_ms = .5;
 thr.length_ms = 1;
+
+if nargin < 3
+    EndTimeS = Inf;
+    if nargin < 2
+        StartTimeS = 0;
+    end
+end
 
 header = ioReadWavHeader(Filename);
 handle = fopen(Filename, 'rb', 'l');
@@ -184,7 +199,6 @@ end
 % of frames per second.
 TotalFrames = (EndTimeS - StartTimeS) / Advance_s;
 FramesPerSecond = 1 / Advance_s;
-fprintf('Frames Per Second: %.2f\n', FramesPerSecond);
 
 % Keep track of the default minimum number of points
 % ResetMinPts will be used to reset the minimum number of points for each
@@ -429,7 +443,6 @@ function str = searchToStr(Search, time)
     
 
 function CSA = getSourceData(start_s, length_s, DeltaFrames, CSAArgs, sp_args) 
-    fprintf('loading block at %f\n', start_s);
     [~, power_dB, ~, ~, ~, ~] = dtProcessBlock(...
         sp_args.handle, sp_args.header, sp_args.channel, ...
         start_s, length_s, [sp_args.Length_samples, sp_args.Advance_samples], ...
