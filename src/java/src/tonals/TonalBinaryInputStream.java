@@ -59,7 +59,9 @@ public class TonalBinaryInputStream {
 		}
 		
 		private void readone() {
-			
+			/* readone() - read one tonal element from the stream 
+			 * Private methods that stores in instance variable t
+			 */
 			try {				
 				count = count + 1;  // one more...
 				
@@ -107,6 +109,7 @@ public class TonalBinaryInputStream {
 		}
 
 		public tonal next() throws NoSuchElementException {
+			/* tonal next() - next object in iterator */
 			if (! valid) {
 				// Last readone caused an IOException, report
 				throw new NoSuchElementException("No more items");				
@@ -125,7 +128,20 @@ public class TonalBinaryInputStream {
 			return current;
 		}
 		
+		public tonal peek() throws NoSuchElementException {
+			/* tonal peek()
+			 * Return the next element to be iterated.
+			 */
+			if (! valid) {
+				// Last readone caused an IOException, report
+				throw new NoSuchElementException("No more items");				
+			} else {
+				return t;				
+			}
+		}
+		
 		public void remove() {
+			/* remove() - Remove an element:  unsupported */
 			throw new UnsupportedOperationException();
 		}
 	}
