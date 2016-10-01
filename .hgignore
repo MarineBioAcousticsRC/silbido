@@ -9,4 +9,7 @@ savedDetections/**
 *.mat
 *.det
 *.orig
+*.mexa64
+tmp
+
 
