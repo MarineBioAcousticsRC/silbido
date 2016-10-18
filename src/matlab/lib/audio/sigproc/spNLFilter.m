@@ -45,6 +45,7 @@ function Result = spNLFilter(Signal, Type, varargin)
 %		Arguments:
 %		Median (Arg 1) - Median filter size
 %		Smooth Size (Arg 2) - Number of points for linear smoother
+%       If arguments are not odd, they will be reduced in size by 1.
 %
 
 if size(Signal, 2) == 1
@@ -62,12 +63,7 @@ if isstr(Type)
      
      FilterSize = varargin{1};
      if license('test', 'signal_toolbox')
-       % User has signal processing toolbox, use it
-       % For small filter sizes, a good chunk of their code
-       % When profiled in Matlab2008b, 40% of the time was spent
-       % dealing with multiple dimensions, and ~4% of the time or more
-       % was spent checking arguments.  This filter is an excellent
-       % candidate for a mex file.
+       % User has signal processing toolbox, use it    
        Result = medfilt1(Signal, FilterSize);
      else
        % Much slower, slightly different results
@@ -77,15 +73,15 @@ if isstr(Type)
        [Dummy, SignalSize] = size(Signal);
        % Handle beginning
        for i = 1:MidPtOffset
-	 Result(i) = median(Signal(1:i+MidPtOffset));
+           Result(i) = median(Signal(1:i+MidPtOffset));
        end
       % Handle middle
       for i = MidPtOffset+1:SignalSize - MidPtOffset
-	Result(i) = median(Signal(i-MidPtOffset:i+MidPtOffset));
+          Result(i) = median(Signal(i-MidPtOffset:i+MidPtOffset));
       end
       % Handle end
       for i = SignalSize - MidPtOffset + 1:SignalSize
-	Result(i) = median(Signal(i-MidPtOffset:SignalSize));
+          Result(i) = median(Signal(i-MidPtOffset:SignalSize));
       end
      end
     
@@ -120,22 +116,25 @@ if isstr(Type)
     narginchk(1,4)
     Median = varargin{1};
     HannSize = varargin{2};
-    if ~ mod(HannSize, 2)
-      error('Hann window size must be odd for Tukey filter');
-    else
-      Offset = floor(HannSize / 2);
+    % Ensure odd
+    if ~ mod(Median, 2)
+        Median = Median - 1;
     end
+    if ~ mod(HannSize, 2)
+        HannSize = HannSize - 1;
+    end
+    delaylinear = floor(HannSize/2);
     
     EstSignal = spNLFilter(Signal, 'Median', Median);
     EstSignal = spNLFilter(EstSignal, 'Hann', HannSize);
-    EstSignal([1:Offset end-Offset+1:end]) = [];	% dump phase shift
+    EstSignal([1:delaylinear, end-delaylinear+1:end]) = [];	% dump phase shift
 
-    Error = Signal - EstSignal;
-    Error = spNLFilter(Error, 'Median', Median);
-    Error = spNLFilter(Error, 'Hann', HannSize);
-    Error([1:Offset end-Offset+1:end]) = [];	% dump phase shift
+    Residual = Signal - EstSignal;
+    Residual = spNLFilter(Residual, 'Median', Median);
+    Residual = spNLFilter(Residual, 'Hann', HannSize);
+    Residual([1:delaylinear, end-delaylinear+1:end]) = [];	% dump phase shift
     
-    Result = EstSignal + Error;
+    Result = EstSignal + Residual;
     
   otherwise
     error(sprintf('Unrecognized filter type "%s"\n', Type));
