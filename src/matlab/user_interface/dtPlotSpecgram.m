@@ -37,6 +37,10 @@ function [AxisH, ImageH, ColorbarH, snr_dB_blk, power_dB] = dtPlotSpecgram(File,
 %       'binary' - index 0 below threshold, 1 above
 %       'floor' - index 0 below threshold, power above
 %   'TransferFn', true|false - enable transfer function if available
+%   'FilterBank', The type of filter bank to use:
+%       'linear' (default) or 'constantQ'. 'linear' provides a standard
+%       linear spacing of center frequencies. 'constantQ' provides a
+%       constant quality analysis with octave filter banks.
 %
 % Returns:
 % AxisH - axis handle to which plots were made
@@ -58,6 +62,7 @@ contrast_Pct = 200;
 TransferFn = false;
 RemoveTransients = false;
 RemovalMethod = '';
+FilterBank = 'linear';
 
 thr = dtParseParameterSet(varargin{:});  % retrieve parameters
 block_len_s = thr.blocklen_s;        % process how much at a time
@@ -90,13 +95,13 @@ while k <= length(varargin)
             end
             k=k+2;
         case 'Range'
-            Range_Hz = varargin{k+1};
-            if length(Range_Hz) ~= 2 || ~ isnumeric(Range_Hz) ...
-                    || diff(Range_Hz) <= 0;
+            freqRange = varargin{k+1};
+            if length(freqRange) ~= 2 || ~ isnumeric(freqRange) ...
+                    || diff(freqRange) <= 0;
                 error('%s arg must be [LowHz, HighHz]', varargin{k});
             end
-            thr.low_cutoff_Hz = Range_Hz(1);
-            thr.high_cutoff_Hz = Range_Hz(2);
+            thr.low_cutoff_Hz = freqRange(1);
+            thr.high_cutoff_Hz = freqRange(2);
             k=k+2;
         case 'Render'
             Render = varargin{k+1}; k=k+2;
@@ -119,6 +124,8 @@ while k <= length(varargin)
             AxisColor =  varargin{k+1}; k=k+2;
         case 'NoiseBoundaries'
             noiseBoundaries = varargin{k+1}; k=k+2;
+        case 'FilterBank'
+            FilterBank = varargin{k+1}; k=k+2;
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -156,24 +163,37 @@ Length_s = thr.length_ms / 1000;
 Length_samples = round(header.fs * Length_s);
 Advance_s = thr.advance_ms / 1000;
 Advance_samples = round(header.fs * Advance_s);
-bin_Hz = 1 / Length_s;
-
-Nyquist_bin = floor(Length_samples/2);
 
 % If low cutoff > high cutoff, set to 0
 if thr.high_cutoff_Hz < thr.low_cutoff_Hz
     thr.low_cutoff_Hz = 0;
 end
-% Determine which bins to use and build frequency axis
-thr.high_cutoff_bins = min(ceil(thr.high_cutoff_Hz/bin_Hz)+1, Nyquist_bin);
-thr.low_cutoff_bins = ceil(thr.low_cutoff_Hz / bin_Hz)+1;
 
-% save indices of freq bins that will be plotted
-range_bins = thr.low_cutoff_bins:thr.high_cutoff_bins; 
-range_binsN = length(range_bins);  % # freq bin count
 
-fHz = thr.low_cutoff_Hz:bin_Hz:thr.high_cutoff_Hz;
-fkHz = fHz / 1000;
+
+if (strcmp(FilterBank, 'linear'))
+    bin_Hz = 1 / Length_s;
+%     Nyquist_bin = floor(Length_samples/2);
+%     
+%     % Determine which bins to use and build frequency axis
+%     thr.high_cutoff_bins = min(ceil(thr.high_cutoff_Hz/bin_Hz)+1, Nyquist_bin);
+%     thr.low_cutoff_bins = ceil(thr.low_cutoff_Hz / bin_Hz)+1;
+%     
+%     % save indices of freq bins that will be plotted
+%     range_bins = thr.low_cutoff_bins:thr.high_cutoff_bins;
+%     range_binsN = length(range_bins);  % # freq bin count
+%     
+    fHz = thr.low_cutoff_Hz:bin_Hz:thr.high_cutoff_Hz;
+    frequencyAxis = fHz / 1000;
+elseif (strcmp(FilterBank, 'constantQ'))
+    % Create an unused ConstantQ object just to extract the frequency
+    % axis.
+    test = ConstantQ(thr.low_cutoff_Hz, thr.high_cutoff_Hz, header.fs, 10000);
+    frequencyAxis = test.getCenterFreqs;
+else
+   error('Invalid value for FilterBank Parameter'); 
+end
+
 
 % determine transfer function if available
 if TransferFn
@@ -232,33 +252,41 @@ while (block_idx <= size(blocks,1))
     [Signal_blk, power_dB_blk, snr_dB_blk, Indices_blk, dft_blk, clickP_blk] = ...
         dtProcessBlock(handle, header, channel, ...
         blkstart_s, length_s, [Length_samples, Advance_samples], ...
-        'Pad', 0, 'Range', range_bins, ...
+        'Pad', 0,  ...
         'Shift', shift_samples, ...
-        'ClickP', [thr.broadband * range_binsN, thr.click_dB], ...
+        'Range', freqRange, ...
+        'ClickP', [thr.broadband, thr.click_dB], ...
         'RemoveTransients', RemoveTransients, ...
         'RemovalMethod', RemovalMethod, ...
-        'Noise', NoiseComp);
+        'Noise', NoiseComp, ...
+        'FilterBank', FilterBank);
 
     switch Render
-       case {'grey', 'gray'}
-           % do nothing
-       case 'binary'
-           snr_dB_blk(snr_dB_blk < thr.whistle_dB) = 0;   % Threshold image
-           snr_dB_blk(snr_dB_blk >= thr.whistle_dB) = 1;
-       case 'floor'
-           snr_dB_blk(snr_dB_blk < thr.whistle_dB) = 0;   % Threshold image
-       otherwise
-           error('Bad render type %s', Render);
+        case {'grey', 'gray'}
+            % do nothing
+        case 'binary'
+            snr_dB_blk(snr_dB_blk < thr.whistle_dB) = 0;   % Threshold image
+            snr_dB_blk(snr_dB_blk >= thr.whistle_dB) = 1;
+        case 'floor'
+            snr_dB_blk(snr_dB_blk < thr.whistle_dB) = 0;   % Threshold image
+        otherwise
+            error('Bad render type %s', Render);
     end
     
-%     % Trim to last complete frame
-%     if Indices.FrameLastComplete < length(Indices.timeidx)
-%         Indices.timeidx(FrameLastComplete+1:end) = [];
-%         snr_dB(:,Indices.FrameLastComplete+1:end) = [];
-%     end
+    %     % Trim to last complete frame
+    %     if Indices.FrameLastComplete < length(Indices.timeidx)
+    %         Indices.timeidx(FrameLastComplete+1:end) = [];
+    %         snr_dB(:,Indices.FrameLastComplete+1:end) = [];
+    %     end
     % plot the block
     %fprintf('Block(%.4f - %.4f) = TimeIdx(%.4f - %.4f)\n', blkstart_s, blkend_s, Indices_blk.timeidx(1), Indices_blk.timeidx(end));
-    ImageH(hidx) = image(Indices_blk.timeidx, fkHz, snr_dB_blk, 'Parent', AxisH);  
+    
+    % Plot spectrogram with image().
+    if (strcmp(FilterBank,'linear'))
+        ImageH(hidx) = image(Indices_blk.timeidx, frequencyAxis, snr_dB_blk, 'Parent', AxisH);
+    elseif (strcmp(FilterBank,'constantQ'))
+        ImageH(hidx) = image(Indices_blk.timeidx, log10(frequencyAxis), snr_dB_blk, 'Parent', AxisH);
+    end
     colorData = (contrast_Pct/100) .* snr_dB_blk + bright_dB;
     set(ImageH(hidx), 'CData', colorData);
     
@@ -287,10 +315,16 @@ end
 fclose(handle);
 set(AxisH, 'XLim', [Start_s, Stop_s]);
 set(AxisH, 'YDir', 'normal');
-set(AxisH, 'YLim', [fkHz(1), fkHz(end)]);
+% BT
+%set(AxisH, 'YLim', [frequencyAxis(1), frequencyAxis(end)]);
 set(AxisH, 'fontsize', 12, 'fontweight', 'b');
 xlabel(AxisH, 'time (s)', 'fontsize', 12, 'fontweight', 'b');
-ylabel(AxisH, 'freq (kHz)', 'fontsize', 12, 'fontweight', 'b');
+    if (strcmp(FilterBank,'linear'))
+       ylabel(AxisH, 'freq (kHz)', 'fontsize', 12, 'fontweight', 'b');
+    elseif (strcmp(FilterBank,'constantQ'))
+        ylabel(AxisH, 'log10 freq (Hz)', 'fontsize', 12, 'fontweight', 'b');
+    end
+
 
 ColorbarH = colorbar('peer', AxisH);
 set(get(ColorbarH, 'YLabel'), ...
