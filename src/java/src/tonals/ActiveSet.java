@@ -74,6 +74,8 @@ public class ActiveSet {
 	 * within a particular graph generator.
 	 */
 	private long currentGraphId = 1; 
+    
+    private filterBankBehavior;
 	
 	/*
 	 * ActiveSet
@@ -87,7 +89,12 @@ public class ActiveSet {
 		activeSet = new tfTreeSet();
 		ridgeFrontier = new tfTreeSet();
 		this.partialGraphs = new HashMap<tfnode, PartialGraph>();
+        this.filterBankBehavior = new FilterBankBehavior("linear");
 	}
+    
+    public ActiveSet(FilterBankBehavior filterBankBehavior){
+        this.filterBankBehavior = filterBankBehavior;
+    }
 	
 	public tfTreeSet getActiveSet() {
 		return this.activeSet;
