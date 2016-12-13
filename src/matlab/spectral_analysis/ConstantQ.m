@@ -20,7 +20,7 @@ classdef ConstantQ < handle
         halfbandStates;
         bandpassStates;
         
-        filtersPerOctave = 100;
+        filtersPerOctave;
         centerFreqRatios;
         bandwidthRatios;
         
@@ -30,9 +30,14 @@ classdef ConstantQ < handle
         
         centerFreqs;
         freqEstimations;
+        
+        init = true;
+        linearEvalPoints;
+        windowWeights;
     end
     methods
-        function object = ConstantQ(freqLow, freqHigh, fileFs, frameSize)
+        
+        function object = ConstantQ(freqLow, freqHigh, fileFs, frameSize, varargin)
             % Ensure proper input
             setFreqMin = object.octaveSetStart;
             setFreqMax = fileFs * (2/6); % Upper limit as reccomended in the lodermilk paper.
@@ -46,6 +51,31 @@ classdef ConstantQ < handle
             end
             if (fileFs <= 0)
                error('fileFs must be greater than 0'); 
+            end
+            
+            object.frameSize = frameSize;
+            
+            % Set defaults for variable arguments.
+            object.filtersPerOctave = 25;
+            
+            % Parse variable arguments.
+            v=1;
+            while v <= length(varargin)
+                switch varargin{v}
+                    case 'numFilters'
+                        object.filtersPerOctave = varargin{v+1}; v=v+2;
+                    otherwise
+                        try
+                            if isnumeric(varargin{v})
+                                errstr = sprintf('Bad option: %f', varargin{v});
+                            else
+                                errstr = sprintf('Bad option: %s', char(varargin{v}));
+                            end
+                        catch e
+                            errstr = sprintf('Bad option in %d''optional argument: %s', v, e.message);
+                        end
+                        error('ConstantQ: %s', errstr);
+                end
             end
             
             % Account for non-natural sampling rate.
@@ -200,7 +230,6 @@ classdef ConstantQ < handle
             % The DFTSize is determined by the size of the data in the top
             % octave's circBuffer cell, which corresponds to the size of
             % the input frame divided by 4.
-            object.frameSize = frameSize;
             DFTSize = object.frameSize/4;
             %Create blackman-harris window.
             window = blackmanharris(DFTSize);
@@ -224,10 +253,15 @@ classdef ConstantQ < handle
             object.polyCoefficients = object.refitLobe(object.polyCoefficients,-1);
             
             % Create kaiser window for DFTs.
+            % TODO change back to kaiser and divide by its sum.
             object.kaiserWindow = kaiser(DFTSize,12);
             object.kaiserWindow = object.kaiserWindow/sum(object.kaiserWindow);
+            %object.kaiserWindow = hamming(DFTSize);
             
-            
+            % Create cache container for reused lookup points and window
+            % weights.
+            object.linearEvalPoints = cell(size(object.octaveSet,1), object.filtersPerOctave);
+            object.windowWeights = cell(size(object.octaveSet,1), object.filtersPerOctave);
             
             % Provide feedback on octaveSet, sampling rate manipulations.
             fprintf('User requested frequency range: %i - %i Hz. \n', freqLow, freqHigh);
@@ -250,12 +284,7 @@ classdef ConstantQ < handle
             for i=size(object.inputBuffer,1):-1:1
                if i==size(object.inputBuffer,1)
                    object.inputBuffer{size(object.inputBuffer,1),1} = topOctaveStruct;
-               else
-                   
-                   % REMOVE THIS TODO:%%%%%%%%%REMOVE REMOVE REMOVE
-                   %object.halfbandStates{i,1} = zeros(size(object.halfbandStates{i,1}));
-                   
-                   
+               else 
                    % Halfband, 2:1 downsampling.
                    [object.inputBuffer{i,1}.data, object.halfbandStates{i,1}] = filter(object.halfband,1,object.inputBuffer{i+1,1}.data, object.halfbandStates{i,1});
                    object.inputBuffer{i,1}.data = object.inputBuffer{i,1}.data(2:2:end);
@@ -271,82 +300,11 @@ classdef ConstantQ < handle
                 object.circBuffer{i,1}.Fs = object.circBuffer{i,1}.Fs/4;
             end
             
-
-            
-            % Perform DFT on each octave, calculating from lowest to highest octave.
-            DFTSize = object.frameSize/4;
-            for i=1:size(object.circBuffer,1)
-                dftData = [];
-                numCells = 2^(size(object.circBuffer,1) - (i-1)-1);
-                % Concatenate data if needed.
-                for j=1:numCells
-                % TODO: REMOVE - TEMP TEST OF NON SEQUENTIAL DATA CAUSING
-                % NOISE FLOORS
-                %for j=1:1
-                    % Concatenate from back to front of circBuffer.
-                    %dftData = [dftData object.circBuffer{i,numCells-(j-1)}.data];
-                    dftData = vertcat(dftData,object.circBuffer{i,numCells-(j-1)}.data);
-                end
-                
-                %Pad dftData with zeros if necessary
-                if (size(dftData,1) < DFTSize)
-                    difference = DFTSize - size(dftData,1);
-                    dftData(end + difference,1) = 0;
-                end
-                
-                % Perform DFT and window operations
-                octaveFFT = fftshift((abs(fft(dftData .* object.kaiserWindow))));
-%                 tempKaiser = kaiser(length(dftData),12);
-%                 tempKaiser = tempKaiser / sum(tempKaiser);
-%                 octaveFFT = fftshift((abs(fft(dftData .* tempKaiser))));
-                octaveFFTdB = fftshift(20*log10(abs(fft(dftData .* object.kaiserWindow))));
-                
-                % Calculate bandwidth of octave after 4:1 DS.
-                octaveBW = (object.topOctaveRatio(2) + object.topOctaveRatio(2)) * object.circBuffer{i,1}.Fs;
-                octaveCenterFreqs = (object.centerFreqRatios .* octaveBW) + (-object.topOctaveRatio(2) * object.circBuffer{i,1}.Fs); % Double check this line.
-                
-                % Calculate frequencies that are multiples of 2pi/N
-                linearFreqs = ((-0.5:1/DFTSize:0.5-1/DFTSize) * object.circBuffer{i,1}.Fs)';
-                for k=1:size(octaveCenterFreqs,1)
-                    % Calculate passband BW for each center frequency filter.
-                    passbandBW = object.bandwidthRatios(k) * octaveBW;
-                    % Create constant-Q filters for this octave.
-                    lowerBound = (octaveCenterFreqs(k) - (passbandBW/2));
-                    upperBound = (octaveCenterFreqs(k) + (passbandBW/2));
-                    linearEvalPoints = (linearFreqs >= lowerBound) & (linearFreqs <= upperBound);
-                    polyvalX = (linearFreqs(linearEvalPoints) - octaveCenterFreqs(k)) / passbandBW;
-                    
-                    % Temporary debugging.
-                    if (false && (i==2 && (k==33 || k==92)))
-                       figure(3);
-                       plot(octaveFFTdB,'-x');
-                       title('octaveFFTdB');
-                       figure(4);
-                       plot(octaveFFT,'-x');
-                       title('octaveFFT');
-                       figure(5);
-                       plot(octaveFFT(linearEvalPoints), '-x');
-                       title('linearFreqs around centerFreq');
-                       figure(6);
-                       plot(10.^(polyval(object.polyCoefficients,polyvalX)/20),'-x');
-                       title('polyval window (linear)');
-                       figure(7);
-                       plot(polyval(object.polyCoefficients,polyvalX), '-x');
-                       title('polyval window (logarithmic)');
-                    end
-                    
-                    % Estimate amplitude of arbitrary center frequency.
-                    % This coresponds to equation 4 in 'An Efficient FFT
-                    % Based Spectrum Analyzer For Arbitrary Center
-                    % Frequencies And Arbitrary Resolutions Analysis'.
-                    freqEstimation = sum(octaveFFT(linearEvalPoints) .* (10.^(polyval(object.polyCoefficients,polyvalX)/20)));
-                    freqEstimation = 20*log10(freqEstimation);
-                    freqEstimation = freqEstimation - 2.899; %Temporary scaling factor correction (-2.899)
-                    
-                    offset = (i-1) * object.filtersPerOctave;
-                    object.freqEstimations(k + offset,1) = freqEstimation;
-                    
-                end
+            if object.init == true
+                object.calculateEstimationsInit;
+                object.init = false;
+            else
+                object.calculateEstimations;
             end
             
             % Prepare outputs.
@@ -399,9 +357,6 @@ classdef ConstantQ < handle
             % filtering.
             offset = size(object.octaveSet,1);
             for i=object.initDSTimes:-1:1
-                % REMOVE THIS TODO:%%%%%%%%%REMOVE REMOVE REMOVE
-                %object.halfbandStates{offset + i,1} = zeros(size(object.halfbandStates{offset + i,1}));
-                
                 [outputFrameStruct.data, object.halfbandStates{offset + i,1}] = filter(object.halfband,1,outputFrameStruct.data,object.halfbandStates{offset + i,1});
                 outputFrameStruct.data = outputFrameStruct.data(2:2:end);
                 outputFrameStruct.Fs = outputFrameStruct.Fs/2;
@@ -432,5 +387,143 @@ classdef ConstantQ < handle
             normFactor = 0.5 / x;
             refitCoefficients = polyfit(xAxis .* normFactor, yAxis,8);
         end
+        
+        function calculateEstimationsInit(object)
+            % Perform DFT on each octave, calculating from lowest to highest octave.
+            DFTSize = object.frameSize/4;
+            for i=1:size(object.circBuffer,1)
+                dftData = [];
+                numCells = 2^(size(object.circBuffer,1) - (i-1)-1);
+                % Concatenate data if needed.
+                for j=1:numCells
+                    dftData = vertcat(dftData,object.circBuffer{i,numCells-(j-1)}.data);
+                end
+                
+                %Pad dftData with zeros if necessary
+                if (size(dftData,1) < DFTSize)
+                    difference = DFTSize - size(dftData,1);
+                    dftData(end + difference,1) = 0;
+                end
+                
+                % Perform DFT and window operations
+                octaveFFT = fftshift((abs(fft(dftData .* object.kaiserWindow))));
+                octaveFFTdB = fftshift(20*log10(abs(fft(dftData .* object.kaiserWindow))));
+                
+                % Calculate bandwidth of octave after 4:1 DS.
+                octaveBW = (object.topOctaveRatio(2) + object.topOctaveRatio(2)) * object.circBuffer{i,1}.Fs;
+                octaveCenterFreqs = (object.centerFreqRatios .* octaveBW) + (-object.topOctaveRatio(2) * object.circBuffer{i,1}.Fs); % Double check this line.
+                
+                % Calculate frequencies that are multiples of 2pi/N
+                linearFreqs = ((-0.5:1/DFTSize:0.5-1/DFTSize) * object.circBuffer{i,1}.Fs)';
+                
+                for k=1:size(octaveCenterFreqs,1)
+                    % Calculate passband BW for each center frequency filter.
+                    passbandBW = object.bandwidthRatios(k) * octaveBW;
+                    % Create constant-Q filters for this octave.
+                    lowerBound = (octaveCenterFreqs(k) - (passbandBW/2));
+                    upperBound = (octaveCenterFreqs(k) + (passbandBW/2));
+                    linearEvalPoints = (linearFreqs >= lowerBound) & (linearFreqs <= upperBound);
+                    object.linearEvalPoints{i,k} = linearEvalPoints;
+                    polyvalX = (linearFreqs(linearEvalPoints) - octaveCenterFreqs(k)) / passbandBW;
+                    
+                    % Temporary debugging.
+                    if (false && (i==2 && (k==33 || k==92)))
+                        figure(3);
+                        plot(octaveFFTdB,'-x');
+                        title('octaveFFTdB');
+                        figure(4);
+                        plot(octaveFFT,'-x');
+                        title('octaveFFT');
+                        figure(5);
+                        plot(octaveFFT(linearEvalPoints), '-x');
+                        title('linearFreqs around centerFreq');
+                        figure(6);
+                        plot(10.^(polyval(object.polyCoefficients,polyvalX)/20),'-x');
+                        title('polyval window (linear)');
+                        figure(7);
+                        plot(polyval(object.polyCoefficients,polyvalX), '-x');
+                        title('polyval window (logarithmic)');
+                    end
+                    
+                    % Estimate amplitude of arbitrary center frequency.
+                    % This coresponds to equation 4 in 'An Efficient FFT
+                    % Based Spectrum Analyzer For Arbitrary Center
+                    % Frequencies And Arbitrary Resolutions Analysis'.
+                    object.windowWeights{i,k} = (10.^(polyval(object.polyCoefficients,polyvalX)/20));
+                    freqEstimation = sum(octaveFFT(linearEvalPoints) .* object.windowWeights{i,k});
+                    % M.R:
+                    %freqEstimation =
+                    %20*log10(freqEstimation/linearBandwidth);
+                    % Where linearBandwidth is diff between high and low
+                    % end of that particular filter.
+                    % Also try
+                    % 20*log10(freqEstimation/(linearBandwidth * # of seconds of analysis from signal for this octave));
+                    % or just /(linBandwidth * [1 for top octave, 2 for
+                    % second octave, 4 for third octave etc.])
+                    
+                   % linearBandwidth = peak2peak(linearFreqs(linearEvalPoints));
+                    %freqEstimation = freqEstimation / (linearBandwidth * (size(object.circBuffer,1) - (i-1)));
+                    freqEstimation = 20*log10(freqEstimation);
+                    freqEstimation = freqEstimation - 2.899; %Temporary scaling factor correction (-2.899)
+                    
+                    offset = (i-1) * object.filtersPerOctave;
+                    object.freqEstimations(k + offset,1) = freqEstimation;
+                    
+                end
+            end
+        end
+        
+        function calculateEstimations(object)
+            % Perform DFT on each octave, calculating from lowest to highest octave.
+            DFTSize = object.frameSize/4;
+            for i=1:size(object.circBuffer,1)
+                dftData = [];
+                numCells = 2^(size(object.circBuffer,1) - (i-1)-1);
+                % Concatenate data if needed.
+                for j=1:numCells
+                    dftData = vertcat(dftData,object.circBuffer{i,numCells-(j-1)}.data);
+                end
+                
+                %Pad dftData with zeros if necessary
+                if (size(dftData,1) < DFTSize)
+                    difference = DFTSize - size(dftData,1);
+                    dftData(end + difference,1) = 0;
+                end
+                
+                % Perform DFT and window operations
+                octaveFFT = fftshift((abs(fft(dftData .* object.kaiserWindow))));
+
+                % Calculate frequencies that are multiples of 2pi/N
+                linearFreqs = ((-0.5:1/DFTSize:0.5-1/DFTSize) * object.circBuffer{i,1}.Fs)';
+                for k=1:object.filtersPerOctave
+                    % Estimate amplitude of arbitrary center frequency.
+                    % This coresponds to equation 4 in 'An Efficient FFT
+                    % Based Spectrum Analyzer For Arbitrary Center
+                    % Frequencies And Arbitrary Resolutions Analysis'.
+                    freqEstimation = sum(octaveFFT(object.linearEvalPoints{i,k}) .* object.windowWeights{i,k});
+                    % M.R:
+                    %freqEstimation =
+                    %20*log10(freqEstimation/linearBandwidth);
+                    % Where linearBandwidth is diff between high and low
+                    % end of that particular filter.
+                    % Also try
+                    % 20*log10(freqEstimation/(linearBandwidth * # of seconds of analysis from signal for this octave));
+                    % or just /(linBandwidth * [1 for top octave, 2 for
+                    % second octave, 4 for third octave etc.])
+                    
+                    %linearBandwidth = peak2peak(linearFreqs(object.linearEvalPoints{i,k}));
+                    %freqEstimation = freqEstimation / (linearBandwidth * (size(object.circBuffer,1) - (i-1)));
+                    freqEstimation = 20*log10(freqEstimation);
+                    freqEstimation = freqEstimation - 2.899; %Temporary scaling factor correction (-2.899)
+                    
+                    offset = (i-1) * object.filtersPerOctave;
+                    object.freqEstimations(k + offset,1) = freqEstimation;
+                    
+                end
+            end
+        end
     end % End private methods.
+    methods(Static)
+
+    end
 end % End class.

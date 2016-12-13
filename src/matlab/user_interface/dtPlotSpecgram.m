@@ -188,8 +188,8 @@ if (strcmp(FilterBank, 'linear'))
 elseif (strcmp(FilterBank, 'constantQ'))
     % Create an unused ConstantQ object just to extract the frequency
     % axis.
-    test = ConstantQ(thr.low_cutoff_Hz, thr.high_cutoff_Hz, header.fs, 10000);
-    frequencyAxis = test.getCenterFreqs;
+    unused = ConstantQ(thr.low_cutoff_Hz, thr.high_cutoff_Hz, header.fs, 10000);
+    frequencyAxis = unused.getCenterFreqs;
 else
    error('Invalid value for FilterBank Parameter'); 
 end
