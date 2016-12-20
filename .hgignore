@@ -15,3 +15,9 @@ tmp
 
 
 .hgignore
+*.m~
+findWhistleEncounters.m
+getWhistleDensity.m
+pruneWhistleDensity.m
+wDensityAnalysis.m
+wdt_gen.m
