@@ -12,7 +12,7 @@ file_type = '*.x.wav';
 
 file_type = '*.mat';
 
-% Get all of the xwav files and paths
+% Get all of the .mat files and paths
 [full,name,path] = utFindFiles(file_type,save_dir,false);
 
 numberFiles = size(full,1);
