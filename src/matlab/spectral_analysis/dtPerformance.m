@@ -257,7 +257,7 @@ while ~ done
             'Channels', channel);
         
         % Use linear FilterBank as default for now. TODO: incorporate constantQ
-        % option in this context as well.
+        % option in this context as well if needed.
         FilterBank = 'linear';
         [power_dB, spec_dB, t_info, dft, clickP] = ...
             dtSpecAnal(pcm, header.fs, Length_samples, Advance_samples, ...
@@ -355,8 +355,13 @@ while ~ done
                 f_interp = interp1(t,f, t_ov);
                 % compute deviations
                 deviation = abs(f_ov - f_interp);
+                % Detected tonal matches with this ground truth tonal.
                 if mean(deviation) <= MatchTolerance_Hz
                     matchedP = true;
+                    % Remove matched detected tonal from false positive
+                    % list. (The false positive list produced
+                    % from dtPerformance is created subtractively,
+                    % rather than additively.)
                     if falsePos.contains(d)
                         falsePos.remove(d);
                     end

@@ -38,9 +38,10 @@ for i = 1:size(test_files,1)
     
     fprintf('Tracking Tonals for file %s ...\n', input_file);
     
-    [detectedTonals] = dtTonalsTracking(input_file,0,inf);
+%     [detectedTonals] = dtTonalsTracking(input_file,0,inf, 'FilterBank', 'linear');
+    [detectedTonals] = dtTonalsTracking(input_file,0,inf, 'FilterBank', 'constantQ', 'Framing', [2 2]);
     
-    if (isempty(fullfile(output_dir, rel_path)))
+    if (~exist(fullfile(output_dir, rel_path), 'dir'))
         mkdir(fullfile(output_dir, rel_path));
     end
     

@@ -4,7 +4,7 @@ function [peak] = consolidate_peaks(peak, smoothed_dB, min_bin_gap)
     too_close_idx = find(peak_dist < min_bin_gap);
 
     while(~isempty(too_close_idx))
-        fprintf('Consolidating peaks\n');
+        %fprintf('Consolidating peaks\n');
         to_close_vals = smoothed_dB(too_close_idx);
         [~, maxidx] = max(to_close_vals);
         max_freq_idx = too_close_idx(maxidx);

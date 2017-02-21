@@ -50,6 +50,8 @@ freqRange = [0 header.fs/2];
 RemoveTransients = false;
 RemovalMethod = 'poly';
 FilterBank = 'linear';
+% Handle for ConstantQ class if 'constantQ' is specified as the FilterBank.
+constantQ = [];
 
 % We cannot use the serial dates as they may contain duty cycling.
 % The alternatives are to find the duty cycles and subtract the missing
@@ -81,7 +83,13 @@ while vidx < length(varargin)
         case 'Noise'
             NoiseSub = varargin{vidx+1}; vidx=vidx+2;
         case 'FilterBank'
-            FilterBank = varargin{vidx+1}; vidx=vidx+2;
+            FilterBank = varargin{vidx+1};
+            if (strcmp(FilterBank, 'constantQ'))
+               constantQ = varargin{vidx+2};
+               vidx = vidx + 3;
+            else
+               vidx=vidx+2;
+            end
         otherwise
             error('Bad optional argument');
     end
@@ -229,11 +237,25 @@ if RemoveTransients
         
 end
 
-% Perform spectral analysis on block
-[power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
-    Length_samples, Advance_samples, shift_samples, ...
-    freqRange, noise_bins_fraction, ...
-    noise_intensity_dB, NoiseSub{1}, FilterBank);
+if (strcmp(FilterBank, 'linear'))
+    % Perform spectral analysis on block
+    % [] Placeholder is used in ConstantQ parameter's place.
+    % TODO: Refactor all this ConstantQ business - proabably should
+    % encapsulate the linear case in its own object and use strategy
+    % pattern or something like that.
+    [power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
+        Length_samples, Advance_samples, shift_samples, ...
+        freqRange, noise_bins_fraction, ...
+        noise_intensity_dB, NoiseSub{1}, FilterBank, []);
+elseif (strcmp(FilterBank, 'constantQ'))
+    % Perform spectral analysis on block
+    [power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
+        Length_samples, Advance_samples, shift_samples, ...
+        freqRange, noise_bins_fraction, ...
+        noise_intensity_dB, NoiseSub{1}, FilterBank, constantQ);
+else
+    
+end
 
 % Convert the padding to frames and remove the frames that should
 % not be processed.
