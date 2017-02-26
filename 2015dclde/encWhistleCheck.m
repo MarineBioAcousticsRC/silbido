@@ -1,5 +1,5 @@
 % use the develfiles struct to find the start and end times of found
-% encounters.
+% click encounters. Then calls on getEncWhistleDensity to check if 
 
 encStruct = struct;
 
@@ -19,6 +19,7 @@ for spIdx = 1:numSpecies
         encStart = dbISO8601toSerialDate(fp{:}.startTime);
         encEnd   = dbISO8601toSerialDate(fp{:}.endTime);
         
+        
         encWdensity = getEncWhistleDensity(wDensityStruct, encProj, ...
             encSite, encStart, encEnd);
         MIN_WHISTLE_DENSITY = 10;
@@ -30,6 +31,7 @@ for spIdx = 1:numSpecies
 %             encStruct.(develfiles(spIdx).species){encIdx} = 1;
 %         end
 %         
+        % 
         encStruct.(develfiles(spIdx).species){encIdx} = ...
             ~isempty(find(encWdensity>MIN_WHISTLE_DENSITY));
 
