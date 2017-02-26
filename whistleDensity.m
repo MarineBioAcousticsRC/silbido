@@ -65,9 +65,9 @@ for fileIdx = 1 : numberFiles
     
     numWhistles = whistlesDetects.size();
     
-   
-    midpts = zeros(numWhistles, 1);
     
+    midpts = zeros(numWhistles, 1);
+    % get the midpoint of each whistle detection
     for idx = 0:numWhistles - 1 
         % Find and store midpoint for each tonal
         tonal = whistlesDetects.get(idx);
@@ -82,6 +82,7 @@ for fileIdx = 1 : numberFiles
     
     histEdges = linspace(0,fileSizeInSeconds, fileSizeInSeconds+1);
     
+    % creates a histogram of detected whistles for a xwav file
     wDensity = histcounts(midpts,histEdges);
 %     W_DENSITY_THRESHOLD_PER_SECOND = 10;
 %     binsWithWhistles = find(wDensity>W_DENSITY_THRESHOLD_PER_SECOND);
