@@ -144,8 +144,11 @@ classdef TonalTracker < handle
             tt.thr.minlen_frames = tt.thr.minlen_ms / tt.thr.advance_ms;                                         
             tt.thr.maxgap_s = tt.thr.maxgap_ms / 1000;
             
-                           %tt.thr.maxgap_Hz = 50000; %TODO: REMOVE THIS
-                           %tt.thr.maxgap_s = 1; %REMOVE THIS
+%           TODO: REMOVE - Manual override of parameters for testing
+                           tt.thr.maxgap_Hz = 5000; %TODO: REMOVE THIS
+%                            tt.thr.maxgap_s = .05; %REMOVE THIS
+%                            tt.thr.minlen_s = 0.07;
+%                            tt.thr.activeset_s = 1;
             
             tt.thr.maxgap_frames = round(tt.thr.maxgap_ms / tt.thr.advance_ms);
             % New peak is added to the existing peak in the orphan set if the gap

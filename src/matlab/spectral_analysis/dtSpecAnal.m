@@ -84,23 +84,22 @@ elseif (strcmp(FilterBank, 'constantQ'))
     dft = zeros(numBins, last_frame); % Unused.
     power_dB = zeros(numBins, last_frame);
     
-    dBAddition = -3;
+    dBAddition = -4;
     numOctaves = size(constantQ.octaveSet,1);
     numFilters =  constantQ.filtersPerOctave;
     slope = (dBAddition/numFilters);
     p = [slope 0];
     additionPerFilter = arrayfun(@(x) polyval(p,x), [1:numFilters*numOctaves]);
-    
 
     for frameidx = 1:last_frame
         frame = spFrameExtract(Signal,Indices,frameidx);
         [~, outputEstimations] = constantQ.processFrame(frame);
         
         % TODO REMOVE THIS:
-        outputEstimations = outputEstimations + 62;
-%         for i=1:size(outputEstimations,1)
-%            outputEstimations(i,1) = outputEstimations(i,1) + additionPerFilter(i); 
-%         end
+        outputEstimations = outputEstimations + 35;
+        for i=1:size(outputEstimations,1)
+           outputEstimations(i,1) = outputEstimations(i,1) + additionPerFilter(i);
+        end
         
         frame_mag = outputEstimations;
         
@@ -135,13 +134,13 @@ snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp{:}, ~clickP);
 
 
 if (strcmp(FilterBank, 'constantQ'))
-    dBAddition = 1;
-    numOctaves = size(constantQ.octaveSet,1);
-    numFilters =  constantQ.filtersPerOctave;
-    slope = (dBAddition/numFilters);
-    p = [slope 0];
-    additionPerFilter = arrayfun(@(x) polyval(p,x), [1:numFilters*numOctaves]);
-    additionPerFilter = max(additionPerFilter,0);
+%     dBAddition = 1;
+%     numOctaves = size(constantQ.octaveSet,1);
+%     numFilters =  constantQ.filtersPerOctave;
+%     slope = (dBAddition/numFilters);
+%     p = [slope 0];
+%     additionPerFilter = arrayfun(@(x) polyval(p,x), [1:numFilters*numOctaves]);
+%     additionPerFilter = max(additionPerFilter,0);
     
 % TODO REVISE: Testing subtraction as octaves increase to compensate for
 % lost energy with each halfband, bandpass application.
@@ -152,13 +151,13 @@ if (strcmp(FilterBank, 'constantQ'))
 %     p = [slope 0];
 %     additionPerFilter = arrayfun(@(x) polyval(p,x), [1:numFilters*numOctaves]);
 %     
-    for i=1:size(snr_dB,1)
-       snr_dB(i,:) = snr_dB(i,:) + additionPerFilter(i); 
-    end
-
-% Try arbitrarily adding 3 dB post- noise.
 %     for i=1:size(snr_dB,1)
-%        snr_dB(i,:) = snr_dB(i,:) + 3; 
+%        snr_dB(i,:) = snr_dB(i,:) + additionPerFilter(i); 
+%     end
+
+% Try arbitrarily adding 1 dB post- noise.
+%     for i=1:size(snr_dB,1)
+%        snr_dB(i,:) = snr_dB(i,:) + 1; 
 %     end
 
 end
