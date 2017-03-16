@@ -23,6 +23,7 @@ for spIdx = 1:numSpecies
         encWdensity = getEncWhistleDensity(wDensityStruct, encProj, ...
             encSite, encStart, encEnd);
         MIN_WHISTLE_DENSITY = 10;
+        MIN_WHISTLE_COUNTS  = 10;
         %MIN_ENC_WHISTLE_DENSITY = .01;
 %         
 %         encStruct.(develfiles(spIdx).species){encIdx} = 0;
@@ -31,9 +32,12 @@ for spIdx = 1:numSpecies
 %             encStruct.(develfiles(spIdx).species){encIdx} = 1;
 %         end
 %         
-        % 
+        % Save the click encounter as one with whistles if there is at
+        % least one second with the MIN_WHISTLE_DENSITY
+        % currently set to 10 whistles per second
         encStruct.(develfiles(spIdx).species){encIdx} = ...
-            ~isempty(find(encWdensity>MIN_WHISTLE_DENSITY));
+            logical(sum(size(find(encWdensity>MIN_WHISTLE_DENSITY)),2)>...
+                                          MIN_WHISTLE_COUNTS);
 
         
 %          encStruct.(develfiles(spIdx).species){encIdx} = encWdensity;
