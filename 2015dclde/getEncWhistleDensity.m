@@ -1,15 +1,12 @@
 function [encWhistleDensityVector] = getEncWhistleDensity(wDensity, ...
                                        projName,siteName,startTime,endTime)
-
 % getEncWhistleDensity
 % Description:
 % Finds all the associated whistle density (wDensity) counts for a given
 % range of time at a particular project and site of DCLDE
 % Returns:
-% A vector of 
-
-% gets all of the possible whistle density files for a specific project and
-% site
+% A vector of bins with whistle densities associated with given encounter.
+% Each bin represents number of whistles in one second
 projSite = [projName '_' siteName];
 siteFiles = fields(wDensity.(projSite));
 fileparts = regexp(siteFiles, '_', 'split');

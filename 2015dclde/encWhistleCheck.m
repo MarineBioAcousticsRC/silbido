@@ -2,6 +2,8 @@
 % click encounters. Then calls on getEncWhistleDensity to check if 
 
 encStruct = struct;
+getWdens = false;
+allEncWdens = allEncs1secWdensities;
 
 numSpecies = size(develfiles,2);
 for spIdx = 1:numSpecies
@@ -19,10 +21,16 @@ for spIdx = 1:numSpecies
         encStart = dbISO8601toSerialDate(fp{:}.startTime);
         encEnd   = dbISO8601toSerialDate(fp{:}.endTime);
         
+        if(getWdens)
+            encWdensity = getEncWhistleDensity(wDensityStruct, encProj, ...
+                encSite, encStart, encEnd);
+        else
+            
+            encWdensity = allEncWdens.(develfiles(spIdx).species);
+            encWdensity = encWdensity{encIdx};
+        end
         
-        encWdensity = getEncWhistleDensity(wDensityStruct, encProj, ...
-            encSite, encStart, encEnd);
-        MIN_WHISTLE_DENSITY = 10;
+        MIN_WHISTLE_DENSITY = 7;
         MIN_WHISTLE_COUNTS  = 10;
         %MIN_ENC_WHISTLE_DENSITY = .01;
 %         
