@@ -62,8 +62,8 @@ if (strcmp(FilterBank, 'linear'))
     numBins = rangeBinsN;
     
 elseif (strcmp(FilterBank, 'constantQ'))
-    %Temp fix: override advance as we don't want overlapping frames.
-    Advance = Length;
+%     %Temp fix: override advance as we don't want overlapping frames.
+%     Advance = Length;
     frames_per_s = Fs/Advance;
     
     % Remove Shift samples from the length so that we have enough space to
@@ -83,33 +83,14 @@ elseif (strcmp(FilterBank, 'constantQ'))
     numBins = size(constantQ.getCenterFreqs,1);
     dft = zeros(numBins, last_frame); % Unused.
     power_dB = zeros(numBins, last_frame);
-    
-    dBAddition = -4;
-    numOctaves = size(constantQ.octaveSet,1);
-    numFilters =  constantQ.filtersPerOctave;
-    slope = (dBAddition/numFilters);
-    p = [slope 0];
-    additionPerFilter = arrayfun(@(x) polyval(p,x), [1:numFilters*numOctaves]);
-
+      
     for frameidx = 1:last_frame
         frame = spFrameExtract(Signal,Indices,frameidx);
-        [~, outputEstimations] = constantQ.processFrame(frame);
-        
-        % TODO REMOVE THIS:
-        outputEstimations = outputEstimations + 35;
-        for i=1:size(outputEstimations,1)
-           outputEstimations(i,1) = outputEstimations(i,1) + additionPerFilter(i);
-        end
-        
+        [~, outputEstimations] = constantQ.processFrame(frame);      
         frame_mag = outputEstimations;
-        
         power_dB(:,frameidx) = frame_mag;
     end
 end
-
-
-
-
 
 meanf_dB = mean(power_dB, 2);
 for frameidx = 1:last_frame
@@ -131,8 +112,6 @@ end
 snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp{:}, ~clickP);
 
 % Linear addition as the frequency of each constantQ "bin" increases.
-
-
 if (strcmp(FilterBank, 'constantQ'))
 %     dBAddition = 1;
 %     numOctaves = size(constantQ.octaveSet,1);
@@ -141,25 +120,12 @@ if (strcmp(FilterBank, 'constantQ'))
 %     p = [slope 0];
 %     additionPerFilter = arrayfun(@(x) polyval(p,x), [1:numFilters*numOctaves]);
 %     additionPerFilter = max(additionPerFilter,0);
-    
-% TODO REVISE: Testing subtraction as octaves increase to compensate for
-% lost energy with each halfband, bandpass application.
-%     dBAddition = -3;
-%     numOctaves = size(constantQ.octaveSet,1);
-%     numFilters =  constantQ.filtersPerOctave;
-%     slope = (dBAddition/numFilters);
-%     p = [slope 0];
-%     additionPerFilter = arrayfun(@(x) polyval(p,x), [1:numFilters*numOctaves]);
-%     
+% 
 %     for i=1:size(snr_dB,1)
 %        snr_dB(i,:) = snr_dB(i,:) + additionPerFilter(i); 
 %     end
 
-% Try arbitrarily adding 1 dB post- noise.
-%     for i=1:size(snr_dB,1)
-%        snr_dB(i,:) = snr_dB(i,:) + 1; 
-%     end
-
+    snr_dB = snr_dB + 3;
 end
 
 end

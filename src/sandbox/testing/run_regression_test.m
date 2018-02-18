@@ -23,8 +23,8 @@ test_files = ...
 '/lab/speech/corpora/dclmmpa2011/eval_data/Delphinus capensis/CC0707-TA33-070713-202000.wav';
 '/lab/speech/corpora/dclmmpa2011/eval_data/Delphinus capensis/CC0808-TA26-080826-163000.wav';
 '/lab/speech/corpora/dclmmpa2011/eval_data/Delphinus capensis/CC0810-TA30-081029-232000.wav';
-'/lab/speech/corpora/dclmmpa2011/eval_data/Peponocephala electra/FS480Palmyra070924x05x0004 (2).wav';
-'/lab/speech/corpora/dclmmpa2011/eval_data/Peponocephala electra/FS480Palmyra071001x21x0011.wav';
+% '/lab/speech/corpora/dclmmpa2011/eval_data/Peponocephala electra/FS480Palmyra070924x05x0004 (2).wav';
+% '/lab/speech/corpora/dclmmpa2011/eval_data/Peponocephala electra/FS480Palmyra071001x21x0011.wav';
 '/lab/speech/corpora/dclmmpa2011/eval_data/Peponocephala electra/palmyra072006-060803-231815.wav';
 '/lab/speech/corpora/dclmmpa2011/eval_data/Delphinus delphis/CC0707-TA04-070630-145000.wav';
 '/lab/speech/corpora/dclmmpa2011/eval_data/Delphinus delphis/CC0808-TA11-080819-220000 (4).wav';
@@ -39,7 +39,7 @@ for i = 1:size(test_files,1)
     fprintf('Tracking Tonals for file %s ...\n', input_file);
     
 %     [detectedTonals] = dtTonalsTracking(input_file,0,inf, 'FilterBank', 'linear');
-    [detectedTonals] = dtTonalsTracking(input_file,0,inf, 'FilterBank', 'constantQ', 'Framing', [2 2]);
+    [detectedTonals] = dtTonalsTracking(input_file,0,inf, 'FilterBank', 'constantQ', 'Framing', [4 4]);
     
     if (~exist(fullfile(output_dir, rel_path), 'dir'))
         mkdir(fullfile(output_dir, rel_path));

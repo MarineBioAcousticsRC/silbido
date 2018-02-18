@@ -56,7 +56,7 @@ classdef ConstantQ < handle
             object.frameSize = frameSize;
             
             % Set defaults for variable arguments.
-            object.filtersPerOctave = 50;
+            object.filtersPerOctave = 100;
             
             % Parse variable arguments.
             v=1;
@@ -247,15 +247,15 @@ classdef ConstantQ < handle
             normWindowX = normWindowX/(size(mainLobeIndices(1):mainLobeIndices(2)-1,2));
             normWindowY = windowMag(mainLobeIndices(1):mainLobeIndices(2))';
             % Fit polynomial to normalized axis.
-            object.polyCoefficients = polyfit(normWindowX, normWindowY,8);
+            object.polyCoefficients = polyfit(normWindowX, normWindowY,10);
             % Refit the polynomial to the portion of the window at or above
             % -1 dB.
             object.polyCoefficients = object.refitLobe(object.polyCoefficients,-1);
             
             % Create kaiser window for DFTs.
-            object.kaiserWindow = kaiser(DFTSize,12);
+            object.kaiserWindow = kaiser(DFTSize,0);
             % TODO: INVESTIGATING SCALING:
-            %object.kaiserWindow = object.kaiserWindow/sum(object.kaiserWindow);
+            object.kaiserWindow = object.kaiserWindow/sum(object.kaiserWindow);
             %object.kaiserWindow = hamming(DFTSize);
             
             % Create cache container for reused lookup points and window
@@ -392,7 +392,7 @@ classdef ConstantQ < handle
             yAxis = polyval(coefficients,xAxis);
             % Renormalize xAxis to -0.5 to 0.5
             normFactor = 0.5 / x;
-            refitCoefficients = polyfit(xAxis .* normFactor, yAxis,8);
+            refitCoefficients = polyfit(xAxis .* normFactor, yAxis,10);
         end
         
         function calculateEstimationsInit(object)
@@ -404,9 +404,13 @@ classdef ConstantQ < handle
                 % Perform DFT and window operations
                 octaveFFT = fftshift((abs(fft(dftData .* object.kaiserWindow))));
                 
-                % Calculate bandwidth of octave after 4:1 DS.
+                % Calculate bandwidth of octave after 4:1 DS. Alternatively
+                % one can just look up the bandwidths from the octave set.
                 octaveBW = (object.topOctaveRatio(2) + object.topOctaveRatio(2)) * object.circBuffer{i,1}.Fs;
-                octaveCenterFreqs = (object.centerFreqRatios .* octaveBW) + (-object.topOctaveRatio(2) * object.circBuffer{i,1}.Fs); % Double check this line.
+                % DOUBLE CHECK THIS LINE. CONFIRM THAT THIS IS A PROPER WAY
+                % TO "TRANSLATE" CENTER FREQUENCIES ONTO THE 4:1 DOWNSAMLE
+                % DOMAIN.
+                octaveCenterFreqs = (object.centerFreqRatios .* octaveBW) + (-object.topOctaveRatio(2) * object.circBuffer{i,1}.Fs); 
                 
                 % Calculate frequencies that are multiples of 2pi/N
                 linearFreqs = ((-0.5:1/dftSize:0.5-1/dftSize) * object.circBuffer{i,1}.Fs)';
@@ -417,25 +421,27 @@ classdef ConstantQ < handle
                     % Create constant-Q filters for this octave.
                     lowerBound = (octaveCenterFreqs(k) - (passbandBW/2));
                     upperBound = (octaveCenterFreqs(k) + (passbandBW/2));
-                    linearEvalPoints = (linearFreqs >= lowerBound) & (linearFreqs <= upperBound);
+                    linEvalPoints = (linearFreqs >= lowerBound) & (linearFreqs <= upperBound);
                     % Cache look-up points of linear FFT bins for each
                     % proportional filter.
-                    object.linearEvalPoints{i,k} = linearEvalPoints;
+                    object.linearEvalPoints{i,k} = linEvalPoints;
+                    if isequal(object.linearEvalPoints{i,k}, zeros(length(linearFreqs),1))
+                        error('Insufficient input: Decrease number of filters per octave and/or increase frame length.');
+                    end
                     polyvalX = (linearFreqs(object.linearEvalPoints{i,k}) - octaveCenterFreqs(k)) / passbandBW;
                     % Cache window weights of sliding frequency window for each proportional filter.  
                     object.windowWeights{i,k} = (10.^(polyval(object.polyCoefficients,polyvalX)/20));
+                    
                     % Estimate amplitude of arbitrary center frequency.
                     % This coresponds to equation 4 in 'An Efficient FFT
                     % Based Spectrum Analyzer For Arbitrary Center
                     % Frequencies And Arbitrary Resolutions Analysis'.
-%                     freqEstimation = sum(octaveFFT(object.linearEvalPoints{i,k}) .* object.windowWeights{i,k});
-                    freqEstimation = sum(octaveFFT(object.linearEvalPoints{i,k}) .* object.windowWeights{i,k}) / length(object.windowWeights{i,k});
+                    freqEstimation = sum(octaveFFT(object.linearEvalPoints{i,k}) .* object.windowWeights{i,k}) / sum(object.windowWeights{i,k});
                     freqEstimation = 20*log10(freqEstimation);
                     %freqEstimation = freqEstimation - 2.899; %Temporary scaling factor correction (-2.899)
                     
                     offset = (i-1) * object.filtersPerOctave;
-                    object.freqEstimations(k + offset,1) = freqEstimation;
-                    
+                    object.freqEstimations(k + offset,1) = freqEstimation; 
                 end
             end
         end
@@ -454,14 +460,7 @@ classdef ConstantQ < handle
                     % This coresponds to equation 4 in 'An Efficient FFT
                     % Based Spectrum Analyzer For Arbitrary Center
                     % Frequencies And Arbitrary Resolutions Analysis'.
-%                     if (true && (i==2 && (k==33 || k==92)))
-%                         test = 1;
-%                     end
-%                     if (length(find(object.linearEvalPoints{i,k})) == 0)
-%                        test = 1; 
-%                     end
-%                     freqEstimation = sum(octaveFFT(object.linearEvalPoints{i,k}) .* object.windowWeights{i,k});
-                    freqEstimation = sum(octaveFFT(object.linearEvalPoints{i,k}) .* object.windowWeights{i,k}) / length(object.windowWeights{i,k});
+                    freqEstimation = sum(octaveFFT(object.linearEvalPoints{i,k}) .* object.windowWeights{i,k}) / sum(object.windowWeights{i,k});                    
                     freqEstimation = 20*log10(freqEstimation);
                     %freqEstimation = freqEstimation - 2.899; %Temporary scaling factor correction (-2.899)
                     

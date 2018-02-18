@@ -145,7 +145,7 @@ classdef TonalTracker < handle
             tt.thr.maxgap_s = tt.thr.maxgap_ms / 1000;
             
 %           TODO: REMOVE - Manual override of parameters for testing
-                           tt.thr.maxgap_Hz = 5000; %TODO: REMOVE THIS
+%                            tt.thr.maxgap_Hz = 500; %TODO: REMOVE THIS
 %                            tt.thr.maxgap_s = .05; %REMOVE THIS
 %                            tt.thr.minlen_s = 0.07;
 %                            tt.thr.activeset_s = 1;
@@ -204,6 +204,7 @@ classdef TonalTracker < handle
                 %time frame, these nodes are candidates to be connected the current peaks
                 tt.active_set = ActiveSet(LinearBankBehavior(tt.bin_Hz, tt.thr.maxgap_Hz));
             elseif (strcmp(tt.filterBank, 'constantQ'))
+                %TODO:
                 tt.constantQ = ConstantQ(tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz, tt.header.fs, tt.Length_samples);
                 tt.centerFreqs = tt.constantQ.getCenterFreqs();
                 tt.numBins = length(tt.centerFreqs);

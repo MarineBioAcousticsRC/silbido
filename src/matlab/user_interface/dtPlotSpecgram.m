@@ -142,6 +142,8 @@ end
 
 
 header = ioReadWavHeader(File);
+% TODO: REMOVE.
+% header.fs = header.fs * 2;
 handle = fopen(File, 'rb', 'l');
 % Select channel as per Triton
 channel = channelmap(header, File);
@@ -188,6 +190,7 @@ if (strcmp(FilterBank, 'linear'))
 elseif (strcmp(FilterBank, 'constantQ'))
     % Create an unused ConstantQ object just to extract the frequency
     % axis.
+    %TODO: NOTE THE CHANGE. TRYING OUT CQ WITH NO DS.
     constantQ = ConstantQ(thr.low_cutoff_Hz, thr.high_cutoff_Hz, header.fs, Length_samples);
     frequencyAxis = constantQ.getCenterFreqs;
 else

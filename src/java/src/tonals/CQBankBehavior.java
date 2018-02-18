@@ -31,18 +31,16 @@ public class CQBankBehavior extends FilterBankBehavior
     
     public double lowerBound(double inputFreq)
     {
-        int numBinSpan = Math.round(maxGapBins/2);
         int filterIdx = findFilterIdx(inputFreq);
-        int lowerFilterIdx = filterIdx - numBinSpan;
+        int lowerFilterIdx = filterIdx - maxGapBins;
         if (lowerFilterIdx < 0) { lowerFilterIdx = 0; }
         return centerFrequencies[lowerFilterIdx];
     }
     
     public double upperBound(double inputFreq)
     {
-        int numBinSpan = Math.round(maxGapBins/2);
         int filterIdx = findFilterIdx(inputFreq);
-        int upperFilterIdx = filterIdx + numBinSpan;
+        int upperFilterIdx = filterIdx + maxGapBins;
         if (upperFilterIdx > centerFrequencies.length-1) { upperFilterIdx = centerFrequencies.length-1; }
         return centerFrequencies[upperFilterIdx];
     }
