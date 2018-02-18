@@ -8,7 +8,6 @@ function [peak] = consolidate_peaks(peak, smoothed_dB, min_bin_gap)
     % the largest dB valued peaks first then repeat till there are no more
     % peaks that are close
     while(~isempty(too_close_idx))
-        fprintf('Consolidating peaks\n');
         % get the dB values of all the too close peaks
         too_close_vals = smoothed_dB(peak(too_close_idx));
         

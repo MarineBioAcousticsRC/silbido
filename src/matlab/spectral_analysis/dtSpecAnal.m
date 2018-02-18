@@ -1,6 +1,6 @@
 function [power_dB, snr_dB, Indices, dft, clickP] = ...
     dtSpecAnal(Signal, Fs, Length, Advance, Shift, Range, ...
-        BroadbandThrPercent, ClickThr_dB, NoiseComp, FilterBank)
+        BroadbandThrPercent, ClickThr_dB, NoiseComp, FilterBank, constantQ)
 % Perform spectral analysis
 %
 % Signal - 1D signal of interest.
@@ -44,7 +44,9 @@ if (strcmp(FilterBank, 'linear'))
     power_dB = zeros(rangeBinsN, last_frame);
     
     window = hamming(Length);
-    %window = blackmanharris(Length);
+    %TODO: Why no normalizing here?
+    %window = window/sum(window);
+    
     for frameidx = 1:last_frame
         frame = spFrameExtract(Signal,Indices,frameidx);
         
@@ -60,8 +62,8 @@ if (strcmp(FilterBank, 'linear'))
     numBins = rangeBinsN;
     
 elseif (strcmp(FilterBank, 'constantQ'))
-    %Temp fix: override advance as we don't want overlapping frames.
-    Advance = Length;
+%     %Temp fix: override advance as we don't want overlapping frames.
+%     Advance = Length;
     frames_per_s = Fs/Advance;
     
     % Remove Shift samples from the length so that we have enough space to
@@ -75,33 +77,20 @@ elseif (strcmp(FilterBank, 'constantQ'))
     % frame contains a click.
     clickP = zeros(1, last_frame);
     
-    
     % Determine frame size.
     frameSize = size(spFrameExtract(Signal,Indices,1),1);
-    constantQ = ConstantQ(Range(1), Range(2), Fs,frameSize);
+    %constantQ = ConstantQ(Range(1), Range(2), Fs,frameSize);
     numBins = size(constantQ.getCenterFreqs,1);
     dft = zeros(numBins, last_frame); % Unused.
     power_dB = zeros(numBins, last_frame);
-    
+      
     for frameidx = 1:last_frame
         frame = spFrameExtract(Signal,Indices,frameidx);
-        
-        %dft_frame = fft(frame.*window);
-        %dft(:,frameidx) = dft_frame(rangeBins);
-        [~, outputEstimations] = constantQ.processFrame(frame);
-        %REMOVE THIS:
-        outputEstimations = outputEstimations + 30;
-        %frame_mag = abs(dft(:,frameidx));
+        [~, outputEstimations] = constantQ.processFrame(frame);      
         frame_mag = outputEstimations;
-        %frame_mag(frame_mag <= eps) = 10*eps;
-        
         power_dB(:,frameidx) = frame_mag;
     end
 end
-
-
-
-
 
 meanf_dB = mean(power_dB, 2);
 for frameidx = 1:last_frame
@@ -121,3 +110,22 @@ if ~ iscell(NoiseComp)
 end
 
 snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp{:}, ~clickP);
+
+% Linear addition as the frequency of each constantQ "bin" increases.
+if (strcmp(FilterBank, 'constantQ'))
+%     dBAddition = 1;
+%     numOctaves = size(constantQ.octaveSet,1);
+%     numFilters =  constantQ.filtersPerOctave;
+%     slope = (dBAddition/numFilters);
+%     p = [slope 0];
+%     additionPerFilter = arrayfun(@(x) polyval(p,x), [1:numFilters*numOctaves]);
+%     additionPerFilter = max(additionPerFilter,0);
+% 
+%     for i=1:size(snr_dB,1)
+%        snr_dB(i,:) = snr_dB(i,:) + additionPerFilter(i); 
+%     end
+
+    snr_dB = snr_dB + 3;
+end
+
+end
