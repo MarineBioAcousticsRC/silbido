@@ -23,6 +23,12 @@ function [tonals, subgraphs] = dtTonalsTracking(Filename, Start_s, Stop_s, varar
 %       It is recommended that the same noise compensation as
 %       used for creating the tonal set be used.  See
 %       dtSpectrogramNoiseComp for valid methods.
+%   'NoiseBoundaries', B - B is a vector of noise regime boundaries in 
+%        seconds.  Noise is assumed to have different characteristics on
+%        either side of each boundary, confounding any noise compensation 
+%        techniques that assume a homogeneous noise source.  Noise 
+%        estimates will not use data that crosses the boundaries.
+%        Use detect_noise_changes() to produce B.
 %   'RemoveTransients' true(default)|false - Remove short broadband
 %       interference (e.g. echolocation clicks) in the time domain
 %   'Range', [LowCutoff_Hz, HighCutoff_Hz] - low and high cutoff

@@ -87,7 +87,6 @@ public class ActiveSet {
 		activeSet = new tfTreeSet();
 		ridgeFrontier = new tfTreeSet();
 		this.partialGraphs = new HashMap<tfnode, PartialGraph>();
-		System.out.println("Using new code");
 	}
 	
 	public tfTreeSet getActiveSet() {

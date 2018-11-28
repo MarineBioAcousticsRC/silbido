@@ -1,6 +1,6 @@
 function blocks = dtBlocksForSegment(blockBoundaries, start_s, end_s)
 
-if (length(blockBoundaries) < 2)
+if (size(blockBoundaries, 1) < 2)
     err = MException('ResultChk:OutOfRange', ...
         'The blockBoundaries array must have two or more elements.');
     throw(err);

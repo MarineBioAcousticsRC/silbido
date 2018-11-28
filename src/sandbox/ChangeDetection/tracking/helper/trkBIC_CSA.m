@@ -28,10 +28,9 @@ function [MaxBIC, Index, bic] = trkBIC_CSA(CSA, Search, PenaltyWeight, Prior)
         % [SV SQ] = Sums(Start, Stop)
         % Determine sum of vectors and sum of squares over 
         % indicated range.
-          SV = zeros(size(CSA.SV(Start,:)));
-          SQ = zeros(size(CSA.SQ{Start}));
-          for index=Start:Stop
-            SV = SV + CSA.SV(index,:);
+          SV = sum(CSA.SV(Start:Stop, :)); 
+          SQ = CSA.SQ{Start};
+          for index=Start+1:Stop
             SQ = SQ + CSA.SQ{index};
           end
         end

@@ -208,6 +208,7 @@ classdef TonalTracker < handle
             tt.peakN_last_processed = tt.range_binsN * 0.25;  
 
             tt.StartBlock_s = tt.Start_s;
+            tt.current_s = tt.Start_s;
             tt.frame_idx = 0;
             
 
@@ -216,6 +217,15 @@ classdef TonalTracker < handle
                 tt.Advance_s, tt.shift_samples_s);
             
             tt.blocks = dtBlocksForSegment(allBlocks, tt.Start_s, min(tt.Stop_s, file_end_s));
+            % Check for case where the starting time does not result in a
+            % full frame.
+            if tt.blocks(1, 2) - tt.current_s < tt.Length_s + tt.Advance_s
+                tt.blocks(1,:) = [];
+            end
+            if isempty(tt.blocks)
+                error('silbido:Not enough data for specified range');
+            end
+            
             tt.block_idx = 1;
             
             fprintf('\nFile length %.5f\n', file_end_s);
