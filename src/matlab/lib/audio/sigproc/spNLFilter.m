@@ -7,7 +7,7 @@ function Result = spNLFilter(Signal, Type, varargin)
 %	'diff' - Computer Nth difference
 %		N (Arg 1) - Nth difference
 %
-%	'hanning' - Smooth via an N point Hanning filter with
+%	'hann' - Smooth via an N point Hann filter with
 %		normalized coefficients.  
 %		N (Arg 1) - Number of points (odd recommended)
 %		
@@ -23,15 +23,15 @@ function Result = spNLFilter(Signal, Type, varargin)
 %		Rabiner, Sambur, Schmidt
 %
 %         x(n) ----------> + -------|
-%		  |        ^ 	    |
-%		  v        | 	    v
+%		          |        ^ 	   |
+%		          v        | 	   v
 %            |----------|  |   |----------|
 %   	     | median   |  |   | median   |
 %            | smoother |  |   | smoother |
 %            |----------|  |   |----------|
-%	                   |        |        |
-%	                   | -1 --> *        |
-%                      v        ^        v
+%	              |        |        |
+%	              | -1 --> *        |
+%                 v        ^        v
 %            |----------|  |   |----------|
 %     	     | linear   |  |   | linear   |
 %    	     | smoother |  |   | smoother |

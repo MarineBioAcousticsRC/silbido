@@ -21,7 +21,7 @@ function DataNoMeans = spMeansRemoval(Data, Window, Components)
 % commercial purposes without the consent of the author is strictly
 % prohibited. 
 
-error(nargchk(1,3,nargin));
+narginchk(1,3);
 
 if nargin < 2
   Window = 0;
