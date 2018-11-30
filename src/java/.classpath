@@ -4,5 +4,6 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/commons-math3-3.2.jar" sourcepath="lib/commons-math3-3.2-sources.jar"/>
 	<classpathentry kind="lib" path="lib/Jama-1.0.3.jar" sourcepath="lib/Jama-1.0.3-sources.jar"/>
+	<classpathentry kind="lib" path="lib/joda-time-2.10.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

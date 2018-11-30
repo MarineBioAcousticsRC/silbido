@@ -1,66 +1,135 @@
-function dtTonalsSave(Filename, tonals, gui, savemask)
-% dtTonalsSave(Filename, tonals, gui, savemask)
-% Save the list of tonals to the specified file. Tonals with the extension
-% .ton are saved in a legacy Java object format (implementation is a 
-% memory pig).  Files not ending in .ton are saved in the Silbido 
-% file format (recommended).
+function dtTonalsSave(Filename, tonals, varargin)
+% dtTonalsSave(Filename, tonals, OptionalArgs)
+% Save the list of tonals to the specified file.  The recommended 
+% filename extension is '.ann' for annotation file format.  When
+% Filename is set to [], a dialog will request a filename.
 %
-% Filename - Example - 'palmyra092007FS192-071011-230000.wav' or
-%                       []
-% tonals - list of tonals
+% The tonals is a linked list of tonals.  See the documentation for 
+% details on how to create these.
 %
-% If Filename is [] or gui is true, a dialog is presented
-% and the user is allowed to select with the default value
-% being Filename.
+% OptionalArgs:
+%   'Comment', string - Comment to be stored with file
+%   'Dialog', true|false - Display a dialog that prompts for a filename.
+%      Defaults to false unless Filename is empty.
+%   'Save', Mask - Specify parameters to be saved with each point.
+%      Mask is a bitwise or of any of the TonalHeader fields:
+%       per time-freq node measurements: 
+%           TIME, FREQ, SNR, PHASE
+%       per tonal measurements
+%           CONFIDENCE, SCORE, SPECIES, CALL
+%      If not specified, time and frequency only will be saved.  
+%      Note that for each of these, the values must have been set in the
+%      tonals for the fields to be meaningful.
+%    'Version', N - A version number associated with the caller's detector.
+%         It is saved as a short integer, for more sophisticated version
+%         schemes, it is suggested that the comment field be used.
 %
-% The savemask specifies what elements of the tonal will be saved
-% (only applicable to the Silbido format).  The mask must be a bitwise
-% or the the parameters from the Java class TonalHeader.
-% Current values are TIME, FREQ, SNR, PHASE, and DEFAULT.
-% The default is equivalent to:
-%   import tonals.TonalHeader
-%   savemask = bitor(TonalHeader.TIME, TonalHeader.FREQ);
+% Example:
+%  % Invoke code that generates a set of tonals and corresponding scores
+%  tonals = YourDetectionCode('somefile.wav');
+%  % properties of tonals can be set as follows if the detector does not
+%  % do this:
+%  tonals.get(tonal_idx).setScore(some_score);
+%  tonals.get(tonal_idx).setConfidence(some_confidence)
+%  as well as .setSpecies() and .setCall() to set the species id and call
+%     type.
+%
+%  % score times, frequencies, and scores
+%  dtTonalSave('somefile.ann', tonals, 'Save', ...
+%        bitor(TonalHeader.TIME, ...
+%              bitor(TonalHeader.FREQ, TonalHeader.SCORE)));
+%
+%  % similar to above, but save the snr 
+%  dtTonalSave('somefile.ann', tonals, ...
+%     'Save', bitor(TonalHeader.TIME, 
+%                   bitor(TonalHeader.FREQ, TonalHeader.SNR)));
+
 
 import tonals.*;
 
-error(nargchk(2,4,nargin));
-if nargin < 4
-    savemask = bitor(bitor(bitor(TonalHeader.TIME, TonalHeader.FREQ), TonalHeader.RIDGE), TonalHeader.SNR);
-    if nargin < 3
-        gui = isempty(Filename);  % Only use the gui if filename empty
+error(nargchk(2,Inf,nargin));
+
+% Set up defaults
+savemask = TonalHeader.DEFAULT;  % time x freq only
+gui = isempty(Filename);  % graphical prompt?
+scores = [];  % scores associated with each annotation
+confidences = [];  % confidence associated with each annotation
+comment = '';  % comment associated with set of annotations
+version = 0;  % not specified
+
+% Parse the optional arguments, possibly overriding defaults
+vidx = 1;
+while vidx < length(varargin)
+    switch varargin{vidx}
+        case 'Comment'
+            comment = varargin{vidx+1}; vidx = vidx+2;
+        case 'Save'
+            savemask = varargin{vidx+1}; vidx = vidx+2;
+        case 'Scores'
+            scores = varargin{vidx+1}; vidx = vidx+2;
+            if length(scores) ~= tonals.size()
+                error('Score vector must be same size as tonals');
+            end
+        case 'Confidences'
+            confidences = varargin{vidx+1}; vidx = vidx+2;
+            if length(confidences) ~= tonals.size()
+                error('Confidence vector must be same size as tonals');
+            end
+        case 'Dialog'
+            gui = varargin{vidx+1}; vidx = vidx+2;
+        case 'Version'
+            version = varragin{vidx+1};
+            if ~isnumeric(version)
+                error('integer required for version');
+            end
+        otherwise
+            error('Bad optional argument');
     end
 end
 
-pattern = {'*.ann', 'annotation'; '*.ton', 'legacy tonal format (not recommended)'};
+if ~isempty(scores)
+    savemask = bitor(savemask, TonalHeader.SCORE);
+end
+if ~isempty(confidences)
+    savemask = bitor(savemask, TonalHeader.CONFIDENCE);
+end
+
+% Handle graphical prompt if needed
+pattern = {'*.ann', 'annotation'};
 if gui
-    [SaveFile, SaveDir] = uiputfile(pattern, 'Save Tonals', Filename);
+    [SaveFile, SaveDir] = uiputfile(pattern, 'Save Tonal Annotations', Filename);
     if isnumeric(SaveFile)
         return  % cancel
     end
     Filename = fullfile(SaveDir, SaveFile);
 end
 
-[path name ext] = fileparts(Filename);
 % open up file
-if strcmp(ext, '.ton')
-    % Use legacy format
-    tstream = TonalOutputStream(Filename);
-else
-    version = 1;
-    comment = 'none';
-    tstream = TonalBinaryOutputStream(Filename, version, comment,...
-        savemask);
-end
+tstream = TonalBinaryOutputStream(Filename, version, comment, savemask);
+
+% Examine scores and confidences to determine what function to use
+% 0 - no scores or confidences
+% 1 - scores
+% 2 - confidences
+% 3 - scores and confidences
+writeCode = bitor(bitshift(double(~isempty(confidences)), 1), double(~isempty(scores)));
 
 % iterate through tonals
 it = tonals.iterator();
 count = 0;
 while it.hasNext()
-    t = it.next();
-    tstream.write(t);  % write each tonal
     count = count + 1;
-    if rem(count, 100) == 1 && strcmp(ext, '.ton')
-        tstream.objstream.reset();
+    t = it.next();
+    % write each tonal t
+    switch writeCode
+        case 0
+            tstream.write(t);
+        case 1
+            tstream.write_s(t, scores(count));
+        case 2
+            tstream.write_c(t, confidences(count));
+        case 3
+            tstream.write_cs(t, confidences(count), scores(count));
     end
 end
 tstream.close();

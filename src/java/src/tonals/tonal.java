@@ -18,6 +18,13 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
 	final double Pi2 = 2 * Math.PI;
 	final long graphId;
 	
+
+	double score;
+	double confidence;
+	
+	String species;
+	String call;
+	
     /* provide interface for sorting by time 
      * which is not the natural order for this set
      */
@@ -70,6 +77,39 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
 	public long getGraphId() {
 		return graphId;
 	}
+	
+	public double getScore() {
+		return score;
+	}
+
+	public void setScore(double score) {
+		this.score = score;
+	}
+
+	public double getConfidence() {
+		return confidence;
+	}
+
+	public void setConfidence(double confidence) {
+		this.confidence = confidence;
+	}
+
+	public String getSpecies() {
+		return species;
+	}
+
+	public void setSpecies(String species) {
+		this.species = species;
+	}
+
+	public String getCall() {
+		return call;
+	}
+
+	public void setCall(String call) {
+		this.call = call;
+	}
+
 	
 	// 
 	// Read a set of serialized tonals and return them as a linked list.

@@ -13,6 +13,14 @@ public class TonalBinaryOutputStream {
 	// Every file written will now have a header
 	TonalHeader hdr;
 	
+	// per tonal metadata
+	private double confidence;
+	private double score;
+	private String species;
+	private String call;
+	
+	final private String emptyString = new String("");
+	
 	public TonalHeader getHeader() {
 		return hdr;
 	}
@@ -22,6 +30,21 @@ public class TonalBinaryOutputStream {
 	}
 
 
+	/**
+	 * toString - Given a string that may be null return the string or a
+	 *   non-null empty string
+	 * @param x
+	 * @return String 
+	 */
+	private String toString(String x) {
+		String result;
+		if (x == null)
+			result = emptyString;
+		else
+			result = x;
+		return result;
+	}
+	
 	/**
 	 * Construct an output stream where the user specifies
 	 * what features will be saved
@@ -62,12 +85,24 @@ public class TonalBinaryOutputStream {
 	}
 
 
+
 	/*
 	 * Write a tonal to the output stream
 	 * @parm - tonal
 	 */
 	private void write_tonal(tonal t) {
 		try {
+			
+			// Write out any required metadata about the tonal
+			if ((hdr.bitMask & TonalHeader.SCORE) != 0)
+				datastream.writeDouble(t.getScore());
+			if ((hdr.bitMask & TonalHeader.CONFIDENCE) != 0)
+				datastream.writeDouble(t.getConfidence());
+			if ((hdr.bitMask & TonalHeader.SPECIES) != 0)
+				datastream.writeUTF(toString(t.getSpecies()));
+			if ((hdr.bitMask & TonalHeader.CALL) != 0)
+				datastream.writeUTF(t.getCall());
+				
 			datastream.writeLong(t.getGraphId());
 			datastream.writeInt(t.size());
 			// Write out desired items for each time bin
@@ -99,12 +134,16 @@ public class TonalBinaryOutputStream {
 			throw new TonalBinaryFormatError(
 					"Time and freq lengths must match");
 		}
-
-		if ((hdr.bitMask & TonalHeader.SNR) > 0 | 
-				(hdr.bitMask & TonalHeader.PHASE ) > 0) {
+		
+		// Check for required additional data about the tonal path
+		// or metadata about the tonal (the user did not provide these)
+		short unexpected = TonalHeader.SNR | TonalHeader.PHASE | TonalHeader.RIDGE
+				| TonalHeader.SCORE | TonalHeader.CONFIDENCE 
+				| TonalHeader.SPECIES | TonalHeader.SPECIES;
+		if ((hdr.bitMask & unexpected) > 0)
 			throw new TonalBinaryFormatError(
-			  "SNR/PHASE expected, use tonal object version of write call");
-		}
+			  "Additional information besides time and frquency was specifed, use tonal object version of write call");
+
 		try {				
 			// Write the number of nodes followed by the nodes
 			datastream.writeInt(time.length);
@@ -196,7 +235,7 @@ public class TonalBinaryOutputStream {
 	}
 	
 	/*
-	 * Write out a tonal with a confidence metric
+	 * Write out a tonal with a score metric
 	 * Include a score metric.
 	 * @param - tonal
 	 * @param - confidence

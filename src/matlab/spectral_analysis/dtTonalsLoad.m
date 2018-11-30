@@ -1,23 +1,40 @@
-function [tonalList, headerInfo, Filename] = dtTonalsLoad(Filename, gui)
-% tonalList = dtTonalsLoad(Filename, gui)
-% Load a set of tonals from Filename.  If Filename is [] or gui is true
-% the filename is requested via dialog with Filename (if any) as the
-% suggested default value.
+function [tonalList, metaData, Filename] = dtTonalsLoad(Filename, varargin)
+% [tonalList, metaData, Filename] = dtTonalsLoad(Filename, OptionalArgs)
+% Load a set of tonals from Filename.  If Filename is [], a dialog
+% prompts the user for the filename.
 %
-% Filename - Example - 'palmyra092007FS192-071011-230000.bin' or
-%                       []
+% Returns a linked list of tonals and metadata about the tonals.
 %
-% Omit gui or set it to false to simply load from the specified file.
+% The metaData structure contains the following fields:
+%   hdr - Information about the file hdr.
+%   scores - Scores associated with the tonals (empty if not in file)
+%   confidences - Confidence scores associated with the tonals 
+%      (empty if not in file)
+% The returned Filename is only useful if the user was prompted for
+%   a filename.
+%
+% Optional arguments:
+%   'Dialog', true|false - Prompt for a filename.  Defaults to false
+%       unless Filename is empty
+%
+% Example:
+% [detections, info] = dtTonalsLoad('SomeDetectorOutputFile.ann', 'Dialog', true);
+% or 
+% [detections, info, fname] = dtTonalsLoad([]);
+
 import tonals.*
 
-headerInfo = [];
+metaData = [];
+gui = isempty(Filename);
 
-error(nargchk(1,2,nargin));
-if nargin < 2
-    if isempty(Filename)
-        gui = true;
-    else
-        gui = false;
+error(nargchk(1,Inf,nargin));
+vidx = 1;
+while vidx < length(varargin)
+    switch varargin{vidx}
+        case 'Dialog'
+            gui = varargin{vidx+1}; vidx = vidx+2;
+        otherwise
+            error('Bad optional argument');
     end
 end
 
@@ -29,7 +46,7 @@ if gui
          '*_s.gt+;*_s.gt-;*_s.d+', 'Above SNR ground truth and valid detections'
          '*_a.gt+;*_a.gt-;*_a.d+', 'All ground truth and valid detections'
          '*', 'All files',
-         '*.ton', 'legacy tonal format (not recommended)'},...
+         '*.ton', 'legacy tonal format'},...
         'Load Tonals', Filename);
     
     % check for cancel
@@ -45,9 +62,12 @@ end
 [path name ext] = fileparts(Filename);
 if ~strcmp(ext, '.ton')
     % loads binary file
-    tonalBIS = TonalBinaryInputStream(Filename);
+    tonalBIS = TonalBinaryInputStream(Filename);    % retrieve linked list
     tonalList = tonalBIS.getTonals(); 
-    headerInfo = tonalBIS.getHeader();  
+    hdr = tonalBIS.getHeader();
+    metaData.hdr = hdr;
+    metaData.comment = char(hdr.getComment());
+    metaData.version = char(hdr.getUserVersion());
 else if strcmp(ext, '.ton')
         % loads objects
         tonalList = tonals.tonal.tonalsLoad(Filename);
