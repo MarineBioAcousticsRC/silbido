@@ -124,8 +124,16 @@ while k <= length(varargin)
         case 'NoiseBoundaries'
             data.noiseBoundaries = varargin{k+1};
             k=k+2;
+        case 'Noise'
+            data.NoiseMethod = varargin{k+1}; k=k+2;
+            if ~ iscell(data.NoiseMethod)
+                data.NoiseMethod = {data.NoiseMethod};
+            end
         case 'ParameterSet'
             k=k+2;  % already handled
+        case 'FilterBank'
+            data.FilterBank = varargin{k+1};
+            k=k+2;
         otherwise
             error('Unknown paramters %s', varargin{k});
     end
@@ -160,7 +168,7 @@ set(children, 'BusyAction', 'cancel')
 data.breakpoints = [];
 data.stepAction = 0; % 0=detect peaks, 1=prune and extend.
 
-data.debugRenderingManager = DebugRenderingManager(handles, data.thr);
+data.debugRenderingManager = DebugRenderingManager(handles, data.thr, 'FilterBank', data.FilterBank);
 data.stopRequested = false;
 data.pauseRequested = false;
 data.atBreakPoint = false;
@@ -655,8 +663,6 @@ set(handles.Start_s, 'String', num2str(newstart_s));
 [handles, data] = spectrogram(handles, data);
 SaveDataInFigure(handles, data);
 
-
-
 % --------------------------------------------------------------------
 function Detect_Callback(hObject, eventdata, handles)
 % hObject    handle to Detect (see GCBO)
@@ -671,6 +677,7 @@ set(handles.TrackingDebug, 'Pointer', 'watch');
 % Remove any plotted ones
 drawnow update expose;
 
+%TODO: What is DebugTrackingCallback? Matlab cannot find it.
 callback = DebugTrackingCallback(handles, data.thr);
 start_s = str2double(get(handles.Start_s, 'String'));
 end_s = start_s + str2double(get(handles.ViewLength_s, 'String'));
@@ -755,12 +762,14 @@ low_spec_Hz = max(0, data.low_disp_Hz);
         'Framing', [data.thr.advance_ms, data.thr.length_ms], ...
         'Noise', data.NoiseMethod, ...
         'ParameterSet', data.thr, ...
-        'RemoveTransients', data.RemoveTransients, ...
-        'RemovalMethod', data.RemovalMethod, ...
+        'RemoveTransients', data.RemoveTransients,...
         'Range', [low_spec_Hz, data.high_disp_Hz], ...
-        'NoiseBoundaries', nb,...
+        'FilterBank', data.FilterBank, ...
         RenderOpts{:});
-    
+    % These parameters were removed to make this call to dtPlotSpectrogram
+    % identical to the one in dtTonalAnnotate.
+    %         'RemovalMethod', data.RemovalMethod, ...
+    %         'NoiseBoundaries', nb,...
 if data.low_disp_Hz < low_spec_Hz
     set(axisH, 'YLim', ...
         [data.low_disp_Hz/data.scale, data.high_disp_Hz/data.scale]);
@@ -1039,7 +1048,10 @@ if (isfield(data, 'noiseBoundaries') && ...
         'SPCallback', data.debugRenderingManager, ...
         'NoiseBoundaries', data.noiseBoundaries);
 else
-    tt = TonalTracker(data.Filename, data.blkstart_s, data.blkstop_s, 'SPCallback', data.debugRenderingManager);
+    tt = TonalTracker(data.Filename, data.blkstart_s, data.blkstop_s, ...
+        'FilterBank', data.FilterBank, ...
+        'Noise', data.NoiseMethod, ...
+        'SPCallback', data.debugRenderingManager);
 end
 
 data.tt = tt;
@@ -1069,6 +1081,7 @@ drawnow;
 peaks_only = get(handles.peaksOnlyCheckBox, 'Value');
 break_on_peaks = get(handles.breakOnPeaksCheckBox, 'Value');
 
+% Main while loop where most of the tracking/rendering is done.
 while (~data.stopRequested && ~data.pauseRequested)
     frame_time = tt.getCurrentFrameTime();
     data = get(handles.TrackingDebug, 'UserData');

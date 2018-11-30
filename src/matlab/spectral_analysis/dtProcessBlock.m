@@ -17,14 +17,18 @@ function [Signal, power_dB, snr_power_dB, Indices, dft, clickP] = ...
 %   'Pad_s', s - Pad block on each side (if possible) by specified 
 %       value in s.
 %   'Shift', n - Shift analysis by n samples.
-%   'Range', [bins] - Only retain the spectral bins in the specified
-%                     range.
-%   'ClickP' [Bins, dB] - Parameters for the click detection heuristic
-%                      # of bins that must exceed threshold dB
+%   'Range', [lowHz highHz] - Frequency range of signal to be analyzed.
+%   'ClickP' [%Bins, dB] - Parameters for the click detection heuristic.
+%                      Percentage (as a decimal) of bins that must exceed threshold dB
 %   'Noise', NoiseArgs - Noise compensation arguments (cell array to
 %                      pass multiple arguments)
 %   'RemoveTransients', true|false - Reduce the effects of high frequency
 %                      transient calls such as clicks (default true)
+%   'RemovalMethod',TODO: Description
+%   'FilterBank', The type of filter bank to use:
+%       'linear' (default) or 'constantQ'. 'linear' provides a standard
+%       linear spacing of center frequencies. 'constantQ' provides a
+%       constant quality analysis with octave filter banks.
 
 error(nargchk(6, inf, nargin));
 
@@ -39,11 +43,15 @@ end
 block_pad_s = 0;
 shift_samples = 0;
 NoiseSub = {};
-noise_bins_N = 0;
+noise_bins_fraction = 0;
 noise_intensity_dB = 0;
-range_bins = 1:floor(Length_samples/2);
+%range_bins = 1:floor(Length_samples/2);
+freqRange = [0 header.fs/2];
 RemoveTransients = false;
 RemovalMethod = 'poly';
+FilterBank = 'linear';
+% Handle for ConstantQ class if 'constantQ' is specified as the FilterBank.
+constantQ = [];
 
 % We cannot use the serial dates as they may contain duty cycling.
 % The alternatives are to find the duty cycles and subtract the missing
@@ -60,12 +68,12 @@ while vidx < length(varargin)
             if numel(clickargs) ~= 2
                 error('Bad ClickP arguments');
             end
-            noise_bins_N = clickargs(1);
+            noise_bins_fraction = clickargs(1);
             noise_intensity_dB = clickargs(2);
         case 'Pad'
             block_pad_s = varargin{vidx+1}; vidx=vidx+2;
         case 'Range'
-            range_bins = varargin{vidx+1}; vidx=vidx+2;
+            freqRange = varargin{vidx+1}; vidx=vidx+2;
         case 'RemoveTransients'
             RemoveTransients = varargin{vidx+1}; vidx=vidx+2;
         case 'RemovalMethod'
@@ -74,6 +82,14 @@ while vidx < length(varargin)
             shift_samples = varargin{vidx+1}; vidx=vidx+2;
         case 'Noise'
             NoiseSub = varargin{vidx+1}; vidx=vidx+2;
+        case 'FilterBank'
+            FilterBank = varargin{vidx+1};
+            if (strcmp(FilterBank, 'constantQ'))
+               constantQ = varargin{vidx+2};
+               vidx = vidx + 3;
+            else
+               vidx=vidx+2;
+            end
         otherwise
             error('Bad optional argument');
     end
@@ -221,11 +237,25 @@ if RemoveTransients
         
 end
 
-% Perform spectral analysis on block
-[power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
-    Length_samples, Advance_samples, shift_samples, ...
-    range_bins, noise_bins_N, ...
-    noise_intensity_dB, NoiseSub{1});
+if (strcmp(FilterBank, 'linear'))
+    % Perform spectral analysis on block
+    % [] Placeholder is used in ConstantQ parameter's place.
+    % TODO: Refactor all this ConstantQ business - proabably should
+    % encapsulate the linear case in its own object and use strategy
+    % pattern or something like that.
+    [power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
+        Length_samples, Advance_samples, shift_samples, ...
+        freqRange, noise_bins_fraction, ...
+        noise_intensity_dB, NoiseSub{1}, FilterBank, []);
+elseif (strcmp(FilterBank, 'constantQ'))
+    % Perform spectral analysis on block
+    [power_dB, snr_power_dB, Indices, dft, clickP] = dtSpecAnal(Signal, header.fs, ...
+        Length_samples, Advance_samples, shift_samples, ...
+        freqRange, noise_bins_fraction, ...
+        noise_intensity_dB, NoiseSub{1}, FilterBank, constantQ);
+else
+    
+end
 
 % Convert the padding to frames and remove the frames that should
 % not be processed.

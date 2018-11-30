@@ -19,11 +19,11 @@ classdef TonalTracker < handle
         Length_samples;
         snr_power_dB;
         Indices;
-        range_bins;
-        range_binsN;
+        numBins;
         
         OffsetHz;
-      
+        bin_Hz;
+        
         shift_samples;
         shift_samples_s;
         block_padded_s;
@@ -34,7 +34,7 @@ classdef TonalTracker < handle
         smoothed_dB;
         
         current_s;
-        bin_Hz;
+
         frame_idx;
         
         discarded_count;
@@ -49,6 +49,14 @@ classdef TonalTracker < handle
         noiseBoundaries;
         blocks;
         block_idx;
+        
+        filterBank;
+        
+        % Used when using a constantQ filter bank.
+        centerFreqs;
+        % Handle for ConstantQ class. Used only when 'constantQ' is
+        % specified for the FilterBank parameter.
+        constantQ;
     end
     
     methods
@@ -59,7 +67,6 @@ classdef TonalTracker < handle
             
             tt.Start_s = Start_s;
             
- 
             ActiveSet.setDebugging(false);
 
             % Settable Thresholds --------------------------------------------------
@@ -71,7 +78,8 @@ classdef TonalTracker < handle
 
             % Other defaults ------------------------------------------------------
             tt.NoiseSub = 'median';          % what type of noise compensation
-
+            tt.filterBank = 'linear';
+            
             k = 1;
             while k <= length(varargin)
                 switch varargin{k}
@@ -115,6 +123,8 @@ classdef TonalTracker < handle
                         tt.removalMethod = varargin{k+1}; k=k+2;
                     case 'NoiseBoundaries'
                         tt.noiseBoundaries = varargin{k+1}; k=k+2;
+                    case 'FilterBank'
+                        tt.filterBank = varargin{k+1}; k=k+2;
                     otherwise
                         try
                             if isnumeric(varargin{k})
@@ -133,6 +143,13 @@ classdef TonalTracker < handle
             tt.thr.minlen_s = tt.thr.minlen_ms / 1000;
             tt.thr.minlen_frames = tt.thr.minlen_ms / tt.thr.advance_ms;                                         
             tt.thr.maxgap_s = tt.thr.maxgap_ms / 1000;
+            
+%           TODO: REMOVE - Manual override of parameters for testing
+%                            tt.thr.maxgap_Hz = 500; %TODO: REMOVE THIS
+%                            tt.thr.maxgap_s = .05; %REMOVE THIS
+%                            tt.thr.minlen_s = 0.07;
+%                            tt.thr.activeset_s = 1;
+            
             tt.thr.maxgap_frames = round(tt.thr.maxgap_ms / tt.thr.advance_ms);
             % New peak is added to the existing peak in the orphan set if the gap
             % between them is less then thr.maxspace_s. Or else new peak is added to 
@@ -144,7 +161,7 @@ classdef TonalTracker < handle
 
             % active_set - When looking examining peak energies from the current
             % time frame, these nodes are candidates to be connected the current peaks
-            tt.active_set = ActiveSet();
+%             tt.active_set = ActiveSet();
 
             % Start processing ----------------------------------------------------
 
@@ -168,20 +185,45 @@ classdef TonalTracker < handle
             tt.Length_samples = round(tt.header.fs * tt.Length_s);
             tt.Advance_s = tt.thr.advance_ms / 1000;
             tt.Advance_samples = round(tt.header.fs * tt.Advance_s);
-            Nyquist_bin = floor(tt.Length_samples/2);
-
-            tt.bin_Hz = tt.header.fs / tt.Length_samples;    % Hz covered by each freq bin
+            
+            if (strcmp(tt.filterBank, 'linear'))
+                tt.bin_Hz = tt.header.fs / tt.Length_samples;    % Hz covered by each freq bin
+                Nyquist_bin = floor(tt.Length_samples/2);
+                low_cutoff_bins = ceil(tt.thr.low_cutoff_Hz / tt.bin_Hz)+1;
+                high_cutoff_bins = min(ceil(tt.thr.high_cutoff_Hz/tt.bin_Hz)+1, Nyquist_bin);
+                
+                % After discretization, the low frequency cutoff may be different than
+                % what the user specified.  Save the revised frequency
+                tt.OffsetHz = (low_cutoff_bins - 1) * tt.bin_Hz;
+                
+                % save indices of freq bins that will be processed
+                range_bins = low_cutoff_bins:high_cutoff_bins;
+                tt.numBins = length(range_bins);  % # freq bin count
+                
+                % active_set - When looking examining peak energies from the current
+                %time frame, these nodes are candidates to be connected the current peaks
+                tt.active_set = ActiveSet(LinearBankBehavior(tt.bin_Hz, tt.thr.maxgap_Hz));
+            elseif (strcmp(tt.filterBank, 'constantQ'))
+                %TODO:
+                tt.constantQ = ConstantQ(tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz, tt.header.fs, tt.Length_samples);
+                tt.centerFreqs = tt.constantQ.getCenterFreqs();
+                tt.numBins = length(tt.centerFreqs);
+                
+                %Placeholder. TODO: Investigate how ResolutionHz actually
+                % operates.
+                %intArray = javaArray('java.lang.Integer', size(tt.constantQ.octaveSet,1), size(tt.constantQ.octaveSet,2));
+                %doubleArray = javaArray('java.lang.Double', length(tt.constantQ.bandwidthRatios);
+                %tt.bin_Hz = 625;
+                tt.bin_Hz = tt.header.fs / tt.Length_samples;
+                
+                filterBandwidths = tt.constantQ.bandwidthRatios * tt.constantQ.octaveSet(:,1)';
+                filterBandwidths = filterBandwidths(:);
+                cqBankBehavior = CQBankBehavior(tt.thr.resolutionHz, tt.thr.maxgap_Hz, ...
+                                                tt.constantQ.getCenterFreqs, filterBandwidths);
+                tt.active_set = ActiveSet(cqBankBehavior);
+            end
+            
             tt.active_set.setResolutionHz(tt.bin_Hz);
-
-            tt.thr.high_cutoff_bins = min(ceil(tt.thr.high_cutoff_Hz/tt.bin_Hz)+1, Nyquist_bin);
-            tt.thr.low_cutoff_bins = ceil(tt.thr.low_cutoff_Hz / tt.bin_Hz)+1;
-            % After discretization, the low frequency cutoff may be different than
-            % what the user specified.  Save the revised frequency
-            tt.OffsetHz = (tt.thr.low_cutoff_bins - 1) * tt.bin_Hz;
-
-            % save indices of freq bins that will be processed
-            tt.range_bins = tt.thr.low_cutoff_bins:tt.thr.high_cutoff_bins; 
-            tt.range_binsN = length(tt.range_bins);  % # freq bin count
 
             % To compute the phase derivative, we should shift by a small
             % number of samples and take the first difference
@@ -205,7 +247,7 @@ classdef TonalTracker < handle
             % thr.broadband% of the bandwidth range, we are probably in a click.
             % Start w/ heuristic value well beneath the number of bins required
             % to indicate broadband noise.
-            tt.peakN_last_processed = tt.range_binsN * 0.25;  
+            tt.peakN_last_processed = tt.numBins * 0.25;  
 
             tt.StartBlock_s = tt.Start_s;
             tt.current_s = tt.Start_s;
@@ -248,15 +290,32 @@ classdef TonalTracker < handle
             length_s = tt.StopBlock_s - tt.StartBlock_s;
             %fprintf('Processing noise block from %.10f to %.10f\n', tt.StartBlock_s, tt.StopBlock_s);
             
-            [~, ~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
-                tt.handle, tt.header, tt.channel, ...
-                tt.StartBlock_s, length_s, [tt.Length_samples, tt.Advance_samples], ...
-                'Pad', 0, 'Range', tt.range_bins, ...
-                'Shift', tt.shift_samples, ...
-                'ClickP', [tt.thr.broadband * tt.range_binsN, tt.thr.click_dB], ...
-                'RemoveTransients', tt.removeTransients, ...
-                'RemovalMethod', tt.removalMethod, ...
-                'Noise', {tt.NoiseSub});
+            if (strcmp(tt.filterBank, 'linear'))
+                [~, ~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
+                    tt.handle, tt.header, tt.channel, ...
+                    tt.StartBlock_s, length_s, [tt.Length_samples, tt.Advance_samples], ...
+                    'Pad', 0, 'Range', [tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz], ...
+                    'Shift', tt.shift_samples, ...
+                    'ClickP', [tt.thr.broadband, tt.thr.click_dB], ...
+                    'RemoveTransients', tt.removeTransients, ...
+                    'RemovalMethod', tt.removalMethod, ...
+                    'Noise', {tt.NoiseSub}, ...
+                    'FilterBank', tt.filterBank);
+            elseif (strcmp(tt.filterBank, 'constantQ'))
+                % Don't overlap frames with constantQ.
+                tt.Advance_samples = tt.Length_samples;
+                [~, ~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
+                    tt.handle, tt.header, tt.channel, ...
+                    tt.StartBlock_s, length_s, [tt.Length_samples, tt.Advance_samples], ...
+                    'Pad', 0, 'Range', [tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz], ...
+                    'Shift', tt.shift_samples, ...
+                    'ClickP', [tt.thr.broadband, tt.thr.click_dB], ...
+                    'RemoveTransients', tt.removeTransients, ...
+                    'RemovalMethod', tt.removalMethod, ...
+                    'Noise', {tt.NoiseSub}, ...
+                    'FilterBank', tt.filterBank, tt.constantQ);
+            end
+
             
             %fprintf('Processed indicies from %.10f to %.10f\n', tt.Indices.timeidx(1), tt.Indices.timeidx(end));
 
@@ -287,6 +346,7 @@ classdef TonalTracker < handle
            peaks = spPeakSelector(tt.smoothed_dB, 'Method', 'simple');
 
            % Remove peaks that don't meet SNR criterion
+           % BT: Problem w/ CQ lies here - whistle peaks are being removed.
            peaks(tt.smoothed_dB(peaks) < tt.thr.whistle_dB) = [];  
 
            peaks = consolidate_peaks(peaks, tt.smoothed_dB, 2);
@@ -298,17 +358,26 @@ classdef TonalTracker < handle
                % If the number of peaks has increased dramatically between
                % the last frame we processed, assume that we have a broadband
                % signal (click) and skip this frame.
-               increase = (peakN - tt.peakN_last_processed) / tt.range_binsN;
+               increase = (peakN - tt.peakN_last_processed) / tt.numBins;
                if increase > tt.thr.broadband
                    if (tt.callbackSet)
                        tt.SPCallback.handleBroadbandFrame(tt.current_s);
                    end
                else
-                   % Convert the peak location to frequencies.
-                   peak_freq = (peaks - 1)* tt.bin_Hz + tt.OffsetHz;
-                   
-                   if (tt.callbackSet)
-                       tt.SPCallback.handleFramePeaks(tt.current_s, peak_freq);
+                   if (strcmp(tt.filterBank, 'linear'))
+                       % Convert the peak location to frequencies.
+                       peak_freq = (peaks - 1)* tt.bin_Hz + tt.OffsetHz;
+                       
+                       if (tt.callbackSet)
+                           tt.SPCallback.handleFramePeaks(tt.current_s, peak_freq);
+                       end
+                       
+                       
+                   elseif (strcmp(tt.filterBank, 'constantQ'))
+                       peak_freq = tt.centerFreqs(peaks);
+                       if (tt.callbackSet)
+                           tt.SPCallback.handleFramePeaks(tt.current_s, peak_freq);
+                       end
                    end
                    
                    tt.current_frame_peak_bins = peaks;
@@ -370,7 +439,7 @@ classdef TonalTracker < handle
                 % If the number of peaks has increased dramatically between
                 % the last frame we processed, assume that we have a broadband
                 % signal (click) and skip this frame.
-                increase = (peakN - tt.peakN_last_processed) / tt.range_binsN;
+                increase = (peakN - tt.peakN_last_processed) / tt.numBins;
                 if increase > tt.thr.broadband
                     if (tt.callbackSet)
                         tt.SPCallback.handleBroadbandFrame(tt.current_s);
@@ -411,10 +480,10 @@ classdef TonalTracker < handle
                ridges = zeros(size(tt.current_frame_peak_bins));
                
                peak_list = tfTreeSet(times, freqs, dbs, phases, ridges);
-               
+                      
                % Link anything possible from the current active set to the
                % new peaks then add them to the active set.            
-               tt.active_set.extend(peak_list, tt.thr.maxgap_Hz, ...
+               tt.active_set.extend(peak_list, ...
                    tt.thr.predict_lookback_s, tt.thr.activeset_s);
                if (tt.callbackSet)
                    tt.SPCallback.handleActiveSetExtension(tt);
@@ -533,7 +602,7 @@ classdef TonalTracker < handle
                 %               phase to frequency
                 % true, false - vector strength
                 % false, false - polynomial fit of frequency to time
-                g = subgraph.disambiguate(tt.thr.disambiguate_s, tt.thr.resolutionHz,...
+                g = subgraph.disambiguate(tt.thr.disambiguate_s,...
                     false, 0);
                 % Obtain the edges
                 edges = g.topological_sort();

@@ -43,6 +43,10 @@ function [tonals, subgraphs] = dtTonalsTracking(Filename, Start_s, Stop_s, varar
 %       for tonals < .4 s that would have otherwise been detected and
 %       results in a lowering of the FA rate for tonals of the same
 %       duration by about 60%.  
+%   'FilterBank', The type of filter bank to use:
+%       'linear' (default) or 'constantQ'. 'linear' provides a standard
+%       linear spacing of center frequencies. 'constantQ' provides a
+%       constant quality analysis with octave filter banks.
 
 stopwatch = tic;
 
