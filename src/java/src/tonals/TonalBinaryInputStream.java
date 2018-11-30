@@ -27,21 +27,20 @@ public class TonalBinaryInputStream {
 	private FileInputStream filestream;
 	private BufferedInputStream buffstream;
 	public DataInputStream datastream;
+	
+	private final static String emptyString = new String("");
 
 	short fbit_mask = 0x0;	// initialize internal feature bit-mask
 	public LinkedList<tonal> tonals = null;
 	
-	private Vector<Double> confidence;
-	private Vector<Double> score;
 	
 	private static class TonalIterator implements Iterator<tonal> {
 		private TonalBinaryInputStream bis;
 		
 		// Current tonal (we always read one ahead)
 		public tonal t;
-		public double c;
-		public double s;
-		public double graphid;
+;
+
 		
 		public boolean valid;  // Is there a currently valid tonal to be fetched?
 		
@@ -62,25 +61,38 @@ public class TonalBinaryInputStream {
 			/* readone() - read one tonal element from the stream 
 			 * Private methods that stores in instance variable t
 			 */
+			
+			double confidence = 0.0;  // confidence
+			double score = 0.0;  // score
+			String call = emptyString;
+			String species = emptyString;
+			long graphId = -1;
+			
 			try {				
 				count = count + 1;  // one more...
 				
 				double time = Float.NaN, freq = Float.NaN, 
 						phase = Float.NaN ,  snr = Float.NaN;
 				boolean ridge = false;
-				long graphId = -1;
+				
 
 				// Read in metadata about this tonal if specified
 				if (bis.hdr.hasConfidence()) {
-					c = bis.datastream.readDouble();
+					confidence = bis.datastream.readDouble();
 				}
 				if (bis.hdr.hasScore()) {
-					s = bis.datastream.readDouble();
+					score = bis.datastream.readDouble();
 				}
 
+				if (bis.hdr.hasSpecies())
+					species = bis.datastream.readUTF();
+				
+				if (bis.hdr.hasCall())
+					call = bis.datastream.readUTF();
+					
 				// Read tonal itself
 
-				if (bis.hdr.version > 2) {
+				if (bis.hdr.version > 2) {  // information about the graph this came from
 					graphId = bis.datastream.readLong();
 				}
 				
@@ -99,13 +111,30 @@ public class TonalBinaryInputStream {
 					if ((bis.hdr.bitMask & TonalHeader.RIDGE) != 0)
 						ridge = bis.datastream.readBoolean();
 					tfnodes.add(new tfnode(time, freq, snr, phase, ridge));
-					N--;			
+					N--;		
 				}
+				// construct the tonal object
 				t = new tonal(tfnodes, graphId);
+				
+				// set the metadata if needed
+				// Read in metadata about this tonal if specified
+				
+				if (bis.hdr.hasConfidence())
+					t.setConfidence(confidence);
+
+				if (bis.hdr.hasScore())
+					t.setScore(score);
+
+				if (bis.hdr.hasSpecies())
+					t.setSpecies(species);
+				
+				if (bis.hdr.hasCall())
+					t.setCall(call);
+				
 				valid = true;
 			} catch (EOFException e) {
 			} catch (IOException e) {
-			} 		
+			}
 		}
 
 		public tonal next() throws NoSuchElementException {
@@ -114,16 +143,12 @@ public class TonalBinaryInputStream {
 				// Last readone caused an IOException, report
 				throw new NoSuchElementException("No more items");				
 			} 
-			if (bis.hdr.hasConfidence()) {
-				bis.confidence.add(c);
-			}
-			if (bis.hdr.hasScore()) {
-				bis.score.add(s);
-			}
+
 			tonal current = t;  // grab a copy of the current tonal before it is overwritten
+			
 			// Mark tonal as consumed and try to grab another one
-			valid = false;  
-			readone();  
+			valid = false;
+			readone();
 
 			return current;
 		}
@@ -179,39 +204,6 @@ public class TonalBinaryInputStream {
 		mode = ReadMode.ITERATED;
 		return new TonalIterator(this);
 	}
-	/* 
-	 * Return array of confidences for read tonals
-	 */
-	public double[] getConfidences() {
-		double[] conf = null;
-		
-		if (hdr.hasConfidence()) {
-			int N = confidence.size();
-			conf = new double[N];
-			for (int idx=0; idx < N; idx++) {
-				conf[idx] = confidence.get(idx).doubleValue();
-			}
-		} else {
-			conf = null;
-		}
-		return conf;				
-	}
-	
-	/*
-	 * Return array of scores for read tonals
-	 */
-	public double[] getScores() {
-		double[] scr = null;
-		
-		if (hdr.hasScore()) {
-			int N = score.size();
-			scr = new double[N];
-			for (int idx=0; idx < N; idx++) {
-				scr[idx] = score.get(idx).doubleValue();
-			}
-		}
-		return scr;		
-	}
 
 	/*
 	 * Return the header associated with the tonals
@@ -219,7 +211,6 @@ public class TonalBinaryInputStream {
 	public TonalHeader getHeader() {
 		return hdr;
 	}
-
 	
 	public TonalBinaryInputStream(String Filename) throws IOException
 	{ 
@@ -230,24 +221,13 @@ public class TonalBinaryInputStream {
 			
 			// Remember this position until N more bytes are read
 			// (after that, we can forget about it)
+			// We may need to seek back to the beginning if there's no header.
 			datastream.mark(TonalHeader.magicLen + 1);  
 			
 			hdr = new TonalHeader(datastream);
-
-			// Allocate confidence & score vectors if needed.
-			if (hdr.hasConfidence()) {
-				confidence = new Vector<Double>(100, 100);
-			} else {
-				confidence = null;				
-			}
-			if (hdr.hasScore()) {
-				score = new Vector<Double>(100,100);				
-			} else {
-				score = null;
-			}
 			
 			if (hdr.userVersion == -1){
-				// No header was present, rewind file and default assumptions
+				// No header was present, rewind file and use default assumptions
 				datastream.reset();
 			}
 			mode = ReadMode.UNDECIDED;

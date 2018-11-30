@@ -40,13 +40,17 @@ function [handles, cidx]= dtPlotGraph(tonal_collection, varargin)
 %          and DistinguishEdges parameters are not valid
 %          with this option.
 
-    function PlotTonal(tonal)
+    function PlotTonal(tonal, FilterBank)
         % Plot a single edge
         % Uses static scope rules to access details on how to plot
         % and has side effects.
         
         time = tonal.get_time();
-        freq = tonal.get_freq() / scale;
+        if (strcmp(FilterBank, 'linear'))
+            freq = tonal.get_freq() / scale;
+        elseif (strcmp(FilterBank, 'constantQ'))
+            freq = log10(tonal.get_freq()); 
+        end
         if isempty(Color)
             Color = ColorMap(cidx, :);
         end
@@ -92,6 +96,7 @@ EdgeCallback = [];
 Marker = 'none';
 LineWidth = 4;
 AxisH = gca;
+FilterBank = 'linear';
 
 if nargin < 1
     error('A graph to plot must be specified');
@@ -122,6 +127,8 @@ while k <= length(varargin)
             Marker = varargin{k+1}; k=k+2;
         case 'Plot'
             PlotType = varargin{k+1}; k=k+2;
+        case 'FilterBank'
+            FilterBank = varargin{k+1}; k=k+2;
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -167,7 +174,7 @@ tonalIt = tonal_collection.iterator();
 
 while tonalIt.hasNext()
     tonal = tonalIt.next();
-    PlotTonal(tonal);
+    PlotTonal(tonal, FilterBank);
 end
 
 if ~ Distinct

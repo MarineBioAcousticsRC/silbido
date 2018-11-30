@@ -46,19 +46,23 @@ public class graph implements Serializable {
 	public final long candidateJoinCount;
 	public final double graphLengthSeconds;
 	public final double graphHeightFreq;
+    
+    private FilterBankBehavior filterBank;
 
 	public graph(tfnode n) {
-		this(n, 0l, 0l, 0l, 0l, 0d, 0d);
+		this(n, 0l, 0l, 0l, 0l, 0d, 0d, new LinearBankBehavior(125, 1000));
 	}
 	
-	public graph(tfnode n, long graphId, long junctionNodeCount, long avoidedCycleCount, long candidateJoinCount, double graphLengthSeconds, double graphHeightFreq) {
+	public graph(tfnode n, long graphId, long junctionNodeCount, long avoidedCycleCount, 
+                long candidateJoinCount, double graphLengthSeconds, double graphHeightFreq, FilterBankBehavior filterBank) {
 		this.graphId = graphId;
 		this.junctionCount = junctionNodeCount;
 		this.avoidedCycleCount = avoidedCycleCount;
 		this.candidateJoinCount = candidateJoinCount;
 		this.graphLengthSeconds = graphLengthSeconds;
 		this.graphHeightFreq = graphHeightFreq;
-		
+        this.filterBank = filterBank;
+		        
 		// initialize edge list maps
 		in = new HashMap<tfnode, LinkedList<edge<tfnode, tonal>>>();
 		out = new HashMap<tfnode, LinkedList<edge<tfnode, tonal>>>();
@@ -80,7 +84,8 @@ public class graph implements Serializable {
 		this.candidateJoinCount = other.candidateJoinCount;
 		this.graphLengthSeconds = other.graphLengthSeconds;
 		this.graphHeightFreq = other.graphHeightFreq;
-		
+		this.filterBank = other.filterBank.makeClone();
+        
 		in = map_clone(other.in);
 		out = map_clone(other.out);
 		
@@ -357,12 +362,12 @@ public class graph implements Serializable {
 
 	}
 	
-	public graph disambiguate(double disamb_thr_s, double resolutionHz, boolean use_ridges, double ridge_thresh) {
+	public graph disambiguate(double disamb_thr_s, boolean use_ridges, double ridge_thresh) {
 		// Create a moderately deep copy of this graph.
 		// The edge containers have fresh copies, but the edges
 		// and nodes are shared.
 		graph copy = this.clone();
-		copy.compress(disamb_thr_s, resolutionHz);
+		copy.compress(disamb_thr_s);
 		if (use_ridges) {
 			copy.process_bridges(ridge_thresh);
 		}
@@ -378,7 +383,7 @@ public class graph implements Serializable {
 	 * @param fit_dphase - boolean for considering first phase difference
 	 * @param fit_vecstr - boolean for considering vector strength method
 	 */
-	void compress(double disamb_thr_s, double resolutionHz) {
+	void compress(double disamb_thr_s) {
 		debug = false;
 		if (debug) {
 			System.out.printf("compress graph: *************************** \n%s\n", this.toString());
@@ -387,7 +392,6 @@ public class graph implements Serializable {
 		// Remove spurious edges at input/output
 		discard_spurious();
 
-		this.resolutionHz = resolutionHz;
 		// outgoing and incoming edges for junction 
 		LinkedList<edge<tfnode,tonal>> outgoing;
 		LinkedList<edge<tfnode,tonal>> incoming;
@@ -788,14 +792,14 @@ public class graph implements Serializable {
 		} else {
 			fit = FitPolyFactory.createFitPoly(order, path, skip_n, fit_dphase, incoming_edge);
 		}
-		
+        
 		order = order + 1;
 		// If the bit is bad, try the next order up.  
 		// When the frequencies have a standard deviation
 		// that is somewhere near our quantization noise or
 		// if there are not enough points to get a good
 		// higher order fit, we live with the fit we have.
-		while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && path.size() > order*3) {
+		while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * filterBank.binHz(path.getFirst().freq) && path.size() > order*3) {
 			// lousy fit, try again
 //			order = order + 1;
 			FitPoly newFit;

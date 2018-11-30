@@ -74,20 +74,27 @@ public class ActiveSet {
 	 * within a particular graph generator.
 	 */
 	private long currentGraphId = 1; 
+    
+    private  FilterBankBehavior filterBank;
 	
 	/*
 	 * ActiveSet
 	 * TODO:  Write docs
 	 */
-	public ActiveSet() {
-		dummySearchNode = new tfnode(0, 0, 0, 0, false);  // used to search peak list
+// 	public ActiveSet() {
+//         this(new LinearBankBehavior(125, 1000));
+// 	}
+    
+    public ActiveSet(FilterBankBehavior filterBank){
+        dummySearchNode = new tfnode(0, 0, 0, 0, false);  // used to search peak list
 		resultGraphs = new LinkedList<graph>();  // completed subgraphs
 		discardedGraphs= new LinkedList<graph>();  // discarded subgraphs (debug)
 		orphans = new tfTreeSet();
 		activeSet = new tfTreeSet();
 		ridgeFrontier = new tfTreeSet();
 		this.partialGraphs = new HashMap<tfnode, PartialGraph>();
-	}
+        this.filterBank = filterBank;
+    }
 	
 	public tfTreeSet getActiveSet() {
 		return this.activeSet;
@@ -110,7 +117,7 @@ public class ActiveSet {
 		 * 
 		 * Nodes are pruned when they have not been extended in maxgap_s.  
 		 * When this occurs, nodes are discarded if they are not part of a 
-		 * long enough (minlen_s) chain, or saved in the set of tonals. 
+		 * long enough (minlen_s) chain, or they are saved in the set of tonals. 
 		 */
 				
 		if (DEBUGGING) {
@@ -125,7 +132,7 @@ public class ActiveSet {
 	
 	private void prune_aux(double time_s, double minlen_s, double maxgap_s, Collection<tfnode> nodeset) {
 		
-		/* iterate over each item in the active set */
+		/* iterate over each item in the node set */
 		Iterator<tfnode> iter = nodeset.iterator();
 		while (iter.hasNext()) {
 			tfnode node = iter.next();
@@ -133,7 +140,7 @@ public class ActiveSet {
 			
 			if (node.chained_forward()) {
 				/* the node has been incorporated into a chain.  Remove it
-				 * from the ActiveSet.
+				 * from the node set.
 				 * 
 				 * This may not be the right thing to do as it prevents
 				 * the same node from being connected to another node at
@@ -143,7 +150,7 @@ public class ActiveSet {
 				iter.remove();
 				retained = false;
 			} else if (time_s - node.time > maxgap_s) {
-				iter.remove();  // long time no see, remove from active set
+				iter.remove();  // Long time no see, remove from the node set.
 				retained = false;
 			}
 			
@@ -161,12 +168,9 @@ public class ActiveSet {
 					PartialGraph partialGraph = partialGraphs.remove(subgraph_id);
 					double cycleCountPerSecond = (double)partialGraph.getAvoidedCycleCount() / graphLengthTime;
 					double candidateJoinsPerSecond = (double)partialGraph.getCandidateJoinCount() / graphLengthTime;
-					
-					//System.out.println("Graph closed  " + partialGraph.getCycleCount() + " cycles and " + cycleCountPerSecond + " per second");
 
 					// Is the graph span long enough that there could
 					// be a tonal in here?
-					
 					if (graphLengthTime > minlen_s) {
 						if (true || (cycleCountPerSecond <= 1470 && candidateJoinsPerSecond <= 1700)) {
 							//System.out.println("Graph kept with " + cycleCountPerSecond + " cycles / sec");
@@ -187,13 +191,11 @@ public class ActiveSet {
 	}
 	
 	private graph constructGraph(tfnode node, PartialGraph pGraph) {
-		return new graph(node, 
-				getNextGraphId(), 
-				pGraph.getJunctionCount(), 
-				pGraph.getAvoidedCycleCount(), 
-				pGraph.getCandidateJoinCount(),
-				pGraph.getGraphLengthSeconds(),
-				pGraph.getGraphHeightFreq());
+        //TODO: Add FilterBankBehavior to graph constructor.
+		return new graph(node,getNextGraphId(),pGraph.getJunctionCount(), 
+				pGraph.getAvoidedCycleCount(), pGraph.getCandidateJoinCount(),
+				pGraph.getGraphLengthSeconds(),pGraph.getGraphHeightFreq(),
+                filterBank.makeClone());
 	}
 	
 	/**
@@ -206,38 +208,38 @@ public class ActiveSet {
 		return id;
 	}
 	
-	public void add_ridge(double[] times, double[] freqs, double[] dBs, double[] angles, double maxgap_Hz,
-			double activeset_thr_s) {
-		//System.out.println(String.format("Ridge with %d nodes being added at (%f, %f).", times.length, times[0], freqs[0]));
-		
-		double predict_lookback_s = 0.025;
-		
-		tfnode firstNode = tfnode.create(times[0], freqs[0], dBs[0], angles[0], true);
-		
-		tfTreeSet set = new tfTreeSet();
-		set.add(firstNode);
-		
-		extend_aux(set, maxgap_Hz, predict_lookback_s, activeSet, true);
-		extend_aux(set, maxgap_Hz, predict_lookback_s, orphans, false);
-		
-		tfnode lastNode = firstNode;
-		for (int i = 1; i < times.length; i++) {
-			 tfnode curNode = tfnode.create(times[i], freqs[i], dBs[i], angles[i], true);
-			 lastNode.chain_forward(curNode);
-			 lastNode.union(curNode);
-			 lastNode = curNode;
-		}
-		
-		if (lastNode.time - lastNode.earliest_pred > activeset_thr_s) {
-			activeSet.add(lastNode);
-			//System.out.println("Last ridge node added to active set.");
-		} else {
-			orphans.add(lastNode);
-			//System.out.println("Last ridge node added to orphan set.");
-		}
-		
-		this.ridgeFrontier.add(firstNode);
-	}
+// 	public void add_ridge(double[] times, double[] freqs, double[] dBs, double[] angles, double maxgap_Hz,
+// 			double activeset_thr_s) {
+// 		//System.out.println(String.format("Ridge with %d nodes being added at (%f, %f).", times.length, times[0], freqs[0]));
+// 		
+// 		double predict_lookback_s = 0.025;
+// 		
+// 		tfnode firstNode = tfnode.create(times[0], freqs[0], dBs[0], angles[0], true);
+// 		
+// 		tfTreeSet set = new tfTreeSet();
+// 		set.add(firstNode);
+// 		
+// 		extend_aux(set, maxgap_Hz, predict_lookback_s, activeSet, true);
+// 		extend_aux(set, maxgap_Hz, predict_lookback_s, orphans, false);
+// 		
+// 		tfnode lastNode = firstNode;
+// 		for (int i = 1; i < times.length; i++) {
+// 			 tfnode curNode = tfnode.create(times[i], freqs[i], dBs[i], angles[i], true);
+// 			 lastNode.chain_forward(curNode);
+// 			 lastNode.union(curNode);
+// 			 lastNode = curNode;
+// 		}
+// 		
+// 		if (lastNode.time - lastNode.earliest_pred > activeset_thr_s) {
+// 			activeSet.add(lastNode);
+// 			//System.out.println("Last ridge node added to active set.");
+// 		} else {
+// 			orphans.add(lastNode);
+// 			//System.out.println("Last ridge node added to orphan set.");
+// 		}
+// 		
+// 		this.ridgeFrontier.add(firstNode);
+// 	}
 	
 	/**
 	 * Extend the current active and orphan sets of graphs 
@@ -251,7 +253,7 @@ public class ActiveSet {
 	 *    be considered.  When an active set graph has no peaks that satisfy
 	 *    this criterion, the grah is closed off and analyzed for tonals.
 	 */
-	public void extend(tfTreeSet peaks, double maxgap_Hz, 
+	public void extend(tfTreeSet peaks, 
 			double predict_lookback_s, 
 			double activeset_thr_s) {
 		tfTreeSet newRidgeFronteier = new tfTreeSet();
@@ -284,12 +286,13 @@ public class ActiveSet {
 		}
 		
 		// Attempt to join new peaks to existing structure
-		extend_aux(peaks, maxgap_Hz, predict_lookback_s, activeSet, true);
+		extend_aux(peaks, predict_lookback_s, activeSet, true);
+        
 		if (this.ridgeFrontier.size() > 0) {
-			extend_aux(this.ridgeFrontier, maxgap_Hz, predict_lookback_s, activeSet, true);
+			extend_aux(this.ridgeFrontier, predict_lookback_s, activeSet, true);
 		}
 
-		// orphans are short segments and may be spurious.
+		// Orphans are short segments and may be spurious.
 		// We don't let them connect to established subgraphs
 		// until they are long enough at which point they are
 		// promoted to full class citizens in the active set.
@@ -299,11 +302,10 @@ public class ActiveSet {
 		if (DEBUGGING) {
 			System.out.println("Extending orphans");
 		}
-		extend_aux(peaks, maxgap_Hz, predict_lookback_s, orphans, false);
+		extend_aux(peaks, predict_lookback_s, orphans, false);
 		
 		// Determine where to put the new peaks
 		for (tfnode p : peaks) {
-			
 			tfnode subgraph_id = p.find();  // find the subgraph.
 			PartialGraph graph = partialGraphs.get(subgraph_id);
 			
@@ -326,9 +328,9 @@ public class ActiveSet {
 		}
 	}
 
-	private void extend_aux(tfTreeSet peaks, double maxgap_Hz,
+	private void extend_aux(tfTreeSet peaks,
 			double predict_lookback_s, 
-			Collection<tfnode> open, boolean joinExisting) {
+			Collection<tfnode> tfSet, boolean joinExisting) {
 		
 		if (peaks.size() < 1) {
 			return;
@@ -344,19 +346,18 @@ public class ActiveSet {
 		double current_time = peaks.get_time()[0];
 		
 
-		/* Iterate over existing frontier */
-		for (tfnode activenode : open) {
+		/* Iterate over existing node sets (Active/Orphan) */
+		for (tfnode activenode : tfSet) {
 			
-			if (activenode.time >= current_time) {
-				continue;
-			}
-			
-			if (activenode.ridge) {
-				//System.out.println("Ridge now active.");
-			}
+			if (activenode.time >= current_time) { continue; }
+			if (activenode.ridge) { //System.out.println("Ridge now active."); 
+            }
 			
 			/* Start searching from lowest possible peak */
-			dummySearchNode.freq = activenode.freq - maxgap_Hz;
+// 			dummySearchNode.freq = activenode.freq - filterBank.maxGapHz(activenode.freq);
+            dummySearchNode.freq = filterBank.lowerBound(activenode.freq);
+            
+            // Set of peaks with freqs greater or equal to dummy node's freq.
 			NavigableSet<tfnode> search_peaks = peaks.tailSet(dummySearchNode, true);
 			LinkedList<FitPoly> active_fits;
 			tfnode peak;
@@ -365,18 +366,24 @@ public class ActiveSet {
 			if (peak_iter.hasNext()) {
 				peak = peak_iter.next();
 				
-				// prime the loop by checking if peak is close enough to 
-				// the active node.  If it isn't then we know that none of 
-				// the peaks will be in range.
-				inrange = Math.abs(peak.freq - search_peaks.first().freq) < maxgap_Hz;
+                // prime the loop by checking if peak is close enough to
+                // the active node.  If it isn't then we know that none of
+                // the peaks will be in range.
+                
+                // The above comment seems incorrect. Nodes of the active/orphan set
+                // aren't being compared in this line, right? TODO: try changing right
+                // hand side of < to maxgap_Hz * 2, as that makes more sense.
+// 				inrange = Math.abs(peak.freq - search_peaks.first().freq) < filterBank.maxGapHz(peak.freq);
+                
+                inrange = filterBank.inRange(activenode.freq, peak.freq);
+                
+                if (inrange) {
+                    // Determine time x freq trajectories into activenode
+                    active_fits = getFitsForNode(activenode, predict_lookback_s);
+                } else {
+                    active_fits = null;
+                }
 
-				if (inrange) {
-					// Determine time x freq trajectories into activenode
-					active_fits = getFitsForNode(activenode, predict_lookback_s);
-				} else {
-					active_fits = null;
-				}
-				
 				while (inrange) {
 					for (FitPoly fit : active_fits) {
 						// fitness criteria
@@ -395,12 +402,13 @@ public class ActiveSet {
 					if (peak_iter.hasNext()) {
 						peak = peak_iter.next();
 						/* check if close enough in frequency space to connect */ 
-						inrange = Math.abs(peak.freq - activenode.freq) < maxgap_Hz;
+// 						inrange = Math.abs(peak.freq - activenode.freq) < filterBank.maxGapHz(activenode.freq);
+                        inrange = filterBank.inRange(activenode.freq, peak.freq);
 					} else
 						inrange = false;  // no more
 				}
 			}
-		}
+		} // end for loop over node set.
 
 		
 		if (DEBUGGING) {
@@ -414,7 +422,7 @@ public class ActiveSet {
 
 		// now have big list of candidates sorted by priority
 		// need to start connecting things according to the rules
-		double max_err = maxgap_Hz * maxgap_Hz;
+// 		double max_err = maxgap_Hz * maxgap_Hz;
 		boolean join = false;
 		
 		// can't use iterator - poll
@@ -424,6 +432,8 @@ public class ActiveSet {
 				System.out.printf("%s: ", c.toString());
 			}
 			
+            // Currently arbitrarily using the 'to' node's frequency as input.
+            double max_err = Math.pow(filterBank.maxGapHz(c.object.to.freq),2);
 			join = c.score < max_err;  // meets distance criterion?
 			
 			if (join) {
@@ -629,11 +639,10 @@ public class ActiveSet {
 	}
 	
 	public LinkedList<FitPoly> getFitsForNode(tfnode n, double back_s) {
+        
 		LinkedList<FitPoly> list = new LinkedList<FitPoly>();
-
 		// TODO What is this hard coded number.
 		final double 	 fit_thresh = .7;
-		
 		double start = n.time;
 		
 		// time & freq
@@ -652,7 +661,7 @@ public class ActiveSet {
 			f.add(n.freq);
 			depth = depth + 1;
 			if (start - n.time >= back_s || ! n.chained_backward()) {
-//				int order = t.size() > 6?2:1;
+                // int order = t.size() > 6?2:1;
 				int order = 1;
 				// far enough back, fit the polynomial
 				FitPoly fit = FitPolyFactory.createFitPoly(order, t, f);
@@ -667,7 +676,9 @@ public class ActiveSet {
 				// that is somewhere near our quantization noise or
 				// if there are not enough points to get a good
 				// higher order fit, we live with the fit we have.
-				while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * resolutionHz && t.size() > order*3) {
+                
+                // TODO: What to do with resolutionHz in CQ case?
+				while (fit.getAdjustedR2() < fit_thresh && fit.getStdDevOfResiduals() > 2 * filterBank.binHz(n.freq) && t.size() > order*3) {
 					order++;
 					FitPoly newFit = FitPolyFactory.createFitPoly(order, t, f);
 					if(newFit.getAdjustedR2() > fit.getAdjustedR2()){
@@ -678,6 +689,7 @@ public class ActiveSet {
 						System.out.printf("Refit p=%s\n", fit.toString());
 					}
 				}
+                
 				list.add(fit);
 				
 				// we are all done with this one, backtrack if necessary

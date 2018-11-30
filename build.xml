@@ -43,6 +43,15 @@
     <javac srcdir="${java.src}" destdir="${java.build.classes}" includeantruntime="false" target="1.6" source="1.6">
       <classpath refid="silbido-classpath"/>
     </javac>
+   <copy todir="${build.jar}">
+      <fileset dir="${java.lib}">
+        <include name="**/*.jar"/>
+      </fileset>
+      <fileset dir="${build.jar}">
+        <include name="**/*.jar"/>
+      </fileset>
+    </copy>
+
   </target>
 
   <target name="package" depends="buildJar" description="Creates the package to be zipped." >

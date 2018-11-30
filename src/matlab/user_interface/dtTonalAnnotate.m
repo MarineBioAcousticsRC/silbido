@@ -38,6 +38,10 @@ function varargout = dtTonalAnnotate(varargin)
 %       or dtTonalTracking will satisfy this.
 %   'TonalsLoad', filename - Load annotations from the specified 
 %       filename.
+%   'FilterBank', The type of filter bank to use:
+%       'linear' (default) or 'constantQ'. 'linear' provides a standard
+%       linear spacing of center frequencies. 'constantQ' provides a
+%       constant quality analysis with octave filter banks.
 
 % Note:
 % This function requires dtTonalAnnotate.fig to be present and uses
@@ -117,6 +121,7 @@ data.SmoothPolyOrder = 3;
 data.EditKnots = data.SmoothSplineKnots;  % edit as spline
 
 data.Mode = 'annotate';
+data.FilterBank = 'linear';
 
 Filename = '';
 data.RelativeFilePath = '';
@@ -224,6 +229,9 @@ while k <= length(varargin)
             else
                 data.FigureTitle = sprintf('%s: ', FigureTitle);
             end
+        case 'FilterBank'
+            data.FilterBank = varargin{k+1};
+            k=k+2;
         otherwise
             try
                 if isnumeric(varargin{k})
@@ -2031,6 +2039,7 @@ colormap(data.SpecgramColormap);
 % minimum value may be set < 0 for knot editing
 % make sure spectrogram is >= 0
 low_spec_Hz = max(0, data.low_disp_Hz);
+
 [axisH, handles.image, handles.colorbar, snr_dB] = ...
             dtPlotSpecgram(data.Filename, blkstart_s, blkstop_s, ...
             'Contrast_Pct', contrast, 'Brightness_dB', brightness, ...
@@ -2040,7 +2049,9 @@ low_spec_Hz = max(0, data.low_disp_Hz);
             'ParameterSet', data.thr, ...
             'RemoveTransients', data.RemoveTransients, ...
             'Range', [low_spec_Hz, data.high_disp_Hz], ...
+            'FilterBank', data.FilterBank, ...
             RenderOpts{:});
+        
 if data.low_disp_Hz < low_spec_Hz
     set(axisH, 'YLim', ...
         [data.low_disp_Hz/data.scale, data.high_disp_Hz/data.scale]);
@@ -2140,8 +2151,12 @@ function [tonal_h, tonal_r_h, data] = plot_tonal(a_tonal, handles, data)
 % based on the tonal_no.
 
 t = a_tonal.get_time();
-f = a_tonal.get_freq() / data.scale;
-
+f = a_tonal.get_freq();
+if (strcmp(data.FilterBank, 'linear'))
+    f = f / data.scale;
+elseif (strcmp(data.FilterBank, 'constantQ'))
+    f = log10(f); 
+end
 tonal_h = plot(t, f, 'LineStyle', data.LineStyle, ...
     'Color', data.AnnotationColormap(data.AnnotationColorNext, :), ...
     'LineWidth', data.LineWidth, data.MarkerProps{:}, ... 
@@ -3118,7 +3133,8 @@ data = get(handles.Annotation, 'UserData');
 
 SilbidoDebugUI(data.Filename, ...
     'ViewStart', min_s, 'ViewLength', max_s - min_s, ...
-    'ParameterSet', data.thr);
+    'ParameterSet', data.thr, 'FilterBank', data.FilterBank, ...
+    'Noise', data.NoiseMethod);
 
 
 % --- Executes on button press in statsButton.
