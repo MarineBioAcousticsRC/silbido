@@ -47,6 +47,16 @@ switch Fmt.wFormatTag
         err_msg = 'IBM A-law';
     case 259
         err_msg = 'IBM AVC Adaptive Differential';
+    case hex2dec('fffe')
+        % Extensible wave format
+        Fmt.fmt.nBitsPerSample = ...
+            fread(f_handle, 1, 'uint16');
+        % Optional cbSize field let's us know if
+        % how many bits are significant.
+        if ioRIFFCk_BytesRemainingP(f_handle, Chunk, 2)
+            Fmt.fmt.cbSize = ...
+                fread(f_handle, 1, 'uint16');
+        end
     otherwise
         err_msg = sprintf('#%d', wavefmt.wFormatTag);
 end

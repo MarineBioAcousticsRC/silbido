@@ -48,7 +48,7 @@ function varargout = dtTonalAnnotate(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 03-Apr-2016 23:06:53
+% Last Modified by GUIDE v2.5 10-Dec-2018 15:25:13
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -246,11 +246,15 @@ while k <= length(varargin)
     end
 end
 
+handles.color_by = 'color_by_tonal';  % plotting coloring default
 
 % TODO Abstract this.
 % Values for 'Mode' must be 'annotate' or 'analyze'
 % Return an error if otherwise.
 if (strcmp(data.Mode, 'annotate') == 1)
+    % Enable label panel during annotation and disable analysis panel
+    set(handles.label_panel, 'Visible', 'on');
+    set(handles.analysis_panel, 'Visible', 'off');
     if isempty(Filename)
         [Filename, FileDir] = uigetfile('.wav', 'Develop ground truth for file');
         if isnumeric(Filename)
@@ -265,7 +269,10 @@ if (strcmp(data.Mode, 'annotate') == 1)
     else
         data.Filename = Filename;
     end
-elseif (strcmp(data.Mode, 'analyze') == 1)      
+elseif (strcmp(data.Mode, 'analyze') == 1)  
+    % Enable analysis panel during annotation and disable label panel
+    set(handles.label_panel, 'Visible', 'off');
+    set(handles.analysis_panel, 'Visible', 'on');
     if (isempty(data.RelativeFilePath))
         [accepted, corupus_rel_path] = corpus_file_chooser(data.CorpusBaseDir);
         if (accepted)
@@ -276,7 +283,7 @@ elseif (strcmp(data.Mode, 'analyze') == 1)
     set(handles.annotationsCombo,'Enable','On');
     set(handles.allTonalsRadio,'Enable','On');
     set(handles.snrTonalsRadio,'Enable','On');
-    set(handles.uipanel4, 'Title', 'Scored Annotations');
+    set(handles.analysis_panel, 'Title', 'Scored Annotations');
     %TODO: Initialize scored tonals to be displayed on opening.
     %updateDisplayedAnnotations(handles.annotationsCombo, eventdata, handles);
 else
@@ -651,6 +658,20 @@ end
 
 % Create merged tonal
 merged = tonal();
+% See if user wants calls assigned to a label
+if handles.label_asign_mode.Value > 0
+    % Tonal is to be assigned to a species/call
+    sidx = get(handles.species_label, 'Value');
+    species_list = get(handles.species_label', 'String');
+    if ~ strcmp(species_list{sidx}, 'unknown')
+        merged.setSpecies(species_list{sidx});
+    end
+    cidx = get(handles.call_label, 'Value');
+    call_list = get(handles.call_label', 'String');
+    if ~ strcmp(call_list{cidx}, 'unknown')
+        merged.setCall(call_list{cidx});
+    end
+end
     
 for idx=1:selectedN+tonalFromPoints
     if extents(idx,3) <= selectedN
@@ -1966,6 +1987,8 @@ end
 a_tonal = tonal(time, freq);  % create a tonal
 
 
+    
+
 % --------------------------------------------------------------------
 function handles = ReleasePoints(handles)
 % Remove any selected points
@@ -2141,36 +2164,49 @@ if strcmp(get(handles.ViewAnnotations, 'State'), 'off')
     ViewAnnotations_OffCallback(handles.ViewAnnotations, [], handles);
 end
 
-
-
 % --------------------------------------------------------------------
-function [tonal_h, tonal_r_h, data] = plot_tonal(a_tonal, handles, data)
-% plot a tonal and return a handle to the rendered tonal
-% tonal_no indicates the position of the tonal in some list
-% and handles, and data are used to determine the plot characteristics
-% based on the tonal_no.
+function [color, data] = get_plot_color(a_tonal, handles, data)
+% handles = get_plot_color(a_tonal, handles)
+% Determine color of a tonal
 
-t = a_tonal.get_time();
-f = a_tonal.get_freq();
-if (strcmp(data.FilterBank, 'linear'))
-    f = f / data.scale;
-elseif (strcmp(data.FilterBank, 'constantQ'))
-    f = log10(f); 
+% Determine colors
+1;
+handles.color_by
+switch handles.color_by
+    case 'color_by_tonal'
+        color = data.AnnotationColormap(data.AnnotationColorNext, :);
+        % Next plot color
+        data.AnnotationColorNext = ...
+            rem(data.AnnotationColorNext, data.AnnotationColorN)+1;
+    case 'color_by_species'
+        % Get the species and assign it to a color 
+        % Reserve the first color for when there are no labels
+        species = a_tonal.getSpecies();
+        speciesN = size(handles.species_label.String, 1);
+        coloridx = find(strcmp(species, handles.species_label.String));
+        if isempty(coloridx)
+            coloridx = 1;  % No label
+        else
+            coloridx = coloridx + 1;
+        end
+        coloridx = rem(coloridx, data.AnnotationColorN)+1;
+        color = data.AnnotationColormap(coloridx, :);
+        
+    case 'color_by_call'
+        % Get the species and assign it to a color 
+        % Reserve the first color for when there are no labels
+        call = a_tonal.getCall();
+        callN = size(handles.call_label.String, 1);
+        coloridx = find(strcmp(call, handles.call_label.String));
+        if isempty(coloridx)
+            coloridx = 1  % No label
+        else
+            coloridx = coloridx + 1;
+        end
+        coloridx = rem(coloridx, data.AnnotationColorN)+1;
+        color = data.AnnotationColormap(coloridx, :);
 end
-tonal_h = plot(t, f, 'LineStyle', data.LineStyle, ...
-    'Color', data.AnnotationColormap(data.AnnotationColorNext, :), ...
-    'LineWidth', data.LineWidth, data.MarkerProps{:}, ... 
-    'ButtonDownFcn', @selectTonal_Callback);
-set(tonal_h, 'UserData', a_tonal);  % Save the tonal itself
 
-r = a_tonal.get_ridge();
-rt = t(find(r==1));
-rf = f(find(r==1));
-tonal_r_h = scatter(rt, rf);
-
-% Next plot color
-data.AnnotationColorNext = ...
-    rem(data.AnnotationColorNext, data.AnnotationColorN)+1;
 
 % --------------------------------------------------------------------
 function tonal_selected_count(handles)
@@ -2193,6 +2229,36 @@ else
     set(handles.ReleaseSelections, 'Enable', 'on');
     set(handles.Delete, 'Enable', 'on');
 end
+
+% --------------------------------------------------------------------
+function [tonal_h, tonal_r_h, data] = plot_tonal(a_tonal, handles, data)
+% plot a tonal and return a handle to the rendered tonal
+% tonal_no indicates the position of the tonal in some list
+% and handles, and data are used to determine the plot characteristics
+% based on the tonal_no.
+
+t = a_tonal.get_time();
+f = a_tonal.get_freq();
+if (strcmp(data.FilterBank, 'linear'))
+    f = f / data.scale;
+elseif (strcmp(data.FilterBank, 'constantQ'))
+    f = log10(f); 
+end
+
+[color, data] = get_plot_color(a_tonal, handles, data);
+        
+tonal_h = plot(t, f, 'LineStyle', data.LineStyle, ...
+    'Color', color, ...
+    'LineWidth', data.LineWidth, data.MarkerProps{:}, ... 
+    'ButtonDownFcn', @selectTonal_Callback);
+set(tonal_h, 'UserData', a_tonal);  % Save the tonal itself
+
+r = a_tonal.get_ridge();
+rt = t(find(r==1));
+rf = f(find(r==1));
+tonal_r_h = scatter(rt, rf);
+
+
 
 % --------------------------------------------------------------------
 function valid = valid_newpoint(time, freq, Points)
@@ -2592,15 +2658,37 @@ function save_Annotations(hObject, eventdata, handles)
 % hObject    handle to save (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+import tonals.TonalHeader;
 
 data = get(handles.Annotation, 'UserData');
-dtTonalsSave(data.AnnotationFile, data.annotations, true);
+
+% Write out time and freq
+masks = [TonalHeader.TIME, TonalHeader.FREQ];
+% See if there are any species or call data and add the appropriate header
+% if needed.
+N = data.annotations.size();
+idx = 0
+foundSpecies = false;
+foundCall = false;
+while idx < N && (foundSpecies == false || foundCall == false)
+    t = data.annotations.get(idx);
+    foundSpecies = foundSpecies  || ~ isempty(t.getSpecies());
+    foundCall = foundCall | ~ isempty(t.getCall());
+    idx = idx + 1;
+end
+if foundSpecies
+    masks(end+1) = TonalHeader.SPECIES;
+end
+if foundCall
+    masks(end+1) = TonalHeader.CALL;
+end
+dtTonalsSave(data.AnnotationFile, data.annotations, ...
+    'Dialog', true, 'Save', masks);
 
 % --------------------------------------------------------------------
 function SaveDataInFigure(handles, data)
 % Save the handles/data structures as GUI and user data in the 
 % figure
-
 guidata(handles.Annotation, handles);
 set(handles.Annotation, 'UserData', data);
 
@@ -3173,3 +3261,103 @@ function allTonalsRadio_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of allTonalsRadio
+
+
+% --- Executes on button press in label_asign_mode.
+function label_asign_mode_Callback(hObject, eventdata, handles)
+% hObject    handle to label_asign_mode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of label_asign_mode
+
+
+% --- Executes on selection change in species_label.
+function species_label_Callback(hObject, eventdata, handles)
+% hObject    handle to species_label (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns species_label contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from species_label
+
+
+% --- Executes during object creation, after setting all properties.
+function species_label_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to species_label (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in call_label.
+function call_label_Callback(hObject, eventdata, handles)
+% hObject    handle to call_label (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns call_label contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from call_label
+
+
+% --- Executes during object creation, after setting all properties.
+function call_label_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to call_label (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --------------------------------------------------------------------
+function set_colorings_to_Callback(hObject, ~, handles)
+% set_colorings_to(hObject, eventdata, handles)
+% Invoked by coloring menu callbacks.  Implements a radio button
+% like selection and also sets properties to color tonals based on
+% the Tag element of the object
+
+target = hObject.Tag;
+% If the tags are changed in Guide, these must be changed as well.
+tags = {'color_by_tonal', 'color_by_species', 'color_by_call'};
+changed = false;
+for t = 1:length(tags)
+    tgt = handles.(tags{t});
+    if strcmp(tgt.Tag, hObject.Tag)
+        changed = strcmp(tgt.Checked, 'off');
+        if changed
+            tgt.Checked = 'on';
+        end
+        coloring = tags{t}; 
+    else
+        if strcmp(tgt.Checked, 'on')
+            tgt.Checked = 'off';
+        end
+    end
+end
+
+if changed
+    handles.color_by = coloring;
+    % update rendered handles to new view
+    data = handles.Annotation.UserData;
+    for idx = 1:length(handles.Rendered)
+        a_tonal = get(handles.Rendered(idx), 'UserData');
+        [color, data] = get_plot_color(a_tonal, handles, data);
+        fprintf('%d species %s call %s color\n', idx, a_tonal.getSpecies(), a_tonal.getCall());
+        color
+        set(handles.Rendered(idx), 'Color', color);
+    end    
+    % Store user's choice.
+    set(handles.Annotation, 'UserData', data);
+    guidata(hObject, handles);
+end
+
+

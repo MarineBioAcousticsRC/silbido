@@ -90,7 +90,7 @@ public class TonalBinaryOutputStream {
 	 * Write a tonal to the output stream
 	 * @parm - tonal
 	 */
-	private void write_tonal(tonal t) {
+	public void write_tonal(tonal t) {
 		try {
 			
 			// Write out any required metadata about the tonal
@@ -98,10 +98,11 @@ public class TonalBinaryOutputStream {
 				datastream.writeDouble(t.getScore());
 			if ((hdr.bitMask & TonalHeader.CONFIDENCE) != 0)
 				datastream.writeDouble(t.getConfidence());
+			// toString converts NULL to ""
 			if ((hdr.bitMask & TonalHeader.SPECIES) != 0)
 				datastream.writeUTF(toString(t.getSpecies()));
 			if ((hdr.bitMask & TonalHeader.CALL) != 0)
-				datastream.writeUTF(t.getCall());
+				datastream.writeUTF(toString(t.getCall()));
 				
 			datastream.writeLong(t.getGraphId());
 			datastream.writeInt(t.size());
@@ -129,7 +130,7 @@ public class TonalBinaryOutputStream {
 	 * Simple output that does not require a tonal structure.
 	 * Easier for non silbido users
 	 */
-	private void write_tonal(double time[], double freq[]) {
+	public void write_tonal(double time[], double freq[]) {
 		if (time.length != freq.length) {
 			throw new TonalBinaryFormatError(
 					"Time and freq lengths must match");

@@ -12,7 +12,7 @@ function dtTonalsSave(Filename, tonals, varargin)
 %   'Dialog', true|false - Display a dialog that prompts for a filename.
 %      Defaults to false unless Filename is empty.
 %   'Save', Mask - Specify parameters to be saved with each point.
-%      Mask is a bitwise or of any of the TonalHeader fields:
+%      Mask is a bitwise or (bitor) of any of the TonalHeader fields:
 %       per time-freq node measurements: 
 %           TIME, FREQ, SNR, PHASE
 %       per tonal measurements
@@ -20,6 +20,8 @@ function dtTonalsSave(Filename, tonals, varargin)
 %      If not specified, time and frequency only will be saved.  
 %      Note that for each of these, the values must have been set in the
 %      tonals for the fields to be meaningful.
+%      If a vector is passed in, it is assumed that this is a list of 
+%      tonal header fields and they are bitwise or'd for the caller.
 %    'Version', N - A version number associated with the caller's detector.
 %         It is saved as a short integer, for more sophisticated version
 %         schemes, it is suggested that the comment field be used.
@@ -64,17 +66,16 @@ while vidx < length(varargin)
         case 'Comment'
             comment = varargin{vidx+1}; vidx = vidx+2;
         case 'Save'
-            savemask = varargin{vidx+1}; vidx = vidx+2;
-        case 'Scores'
-            scores = varargin{vidx+1}; vidx = vidx+2;
-            if length(scores) ~= tonals.size()
-                error('Score vector must be same size as tonals');
+            masks = varargin{vidx+1}; vidx = vidx+2;
+            if length(masks) > 0
+                savemask = uint16(0);
+                for midx = 1:length(masks)
+                    savemask = bitor(savemask, masks(midx), 'uint16');
+                end
+            else
+                savemask = uint16(masks);
             end
-        case 'Confidences'
-            confidences = varargin{vidx+1}; vidx = vidx+2;
-            if length(confidences) ~= tonals.size()
-                error('Confidence vector must be same size as tonals');
-            end
+
         case 'Dialog'
             gui = varargin{vidx+1}; vidx = vidx+2;
         case 'Version'
@@ -121,15 +122,6 @@ while it.hasNext()
     count = count + 1;
     t = it.next();
     % write each tonal t
-    switch writeCode
-        case 0
-            tstream.write(t);
-        case 1
-            tstream.write_s(t, scores(count));
-        case 2
-            tstream.write_c(t, confidences(count));
-        case 3
-            tstream.write_cs(t, confidences(count), scores(count));
-    end
+    tstream.write_tonal(t);
 end
 tstream.close();

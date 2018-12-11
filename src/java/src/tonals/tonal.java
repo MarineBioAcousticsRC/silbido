@@ -267,7 +267,13 @@ public class tonal extends LinkedList<tfnode> implements Comparable<tonal>, Seri
 
 	// deep copy of list structure, but not list itself
 	public tonal clone() {
-		return new tonal(this, this.graphId);
+		tonal a_tonal = new tonal(this, this.graphId);
+		a_tonal.species = this.species;
+		a_tonal.call = this.call;
+		a_tonal.score = this.score;
+		a_tonal.confidence = this.confidence;
+		
+		return a_tonal; 
 	}
 	
 	// are two tonal paths the same?
