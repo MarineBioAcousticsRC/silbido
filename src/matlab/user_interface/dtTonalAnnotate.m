@@ -1557,7 +1557,7 @@ function load_Annotations(hObject, eventdata, handles)
 data = get(handles.Annotation, 'UserData');
 % Load in the annotations.  Make sure to pick up the name
 % the user selected as they may have changed it.
-[tonal_set, header, annotfile] = dtTonalsLoad(data.AnnotationFile, true);
+[tonal_set, header, annotfile] = dtTonalsLoad(data.AnnotationFile, 'Dialog', true);
 process_loaded_tonals(hObject, handles, tonal_set, annotfile);
 
 
