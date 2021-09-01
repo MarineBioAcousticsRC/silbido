@@ -54,7 +54,7 @@ if (strcmp(FilterBank, 'linear'))
         dft(:,frameidx) = dft_frame(rangeBins);
         
         frame_mag = abs(dft(:,frameidx));
-        frame_mag(frame_mag <= eps) = 10*eps;
+        %frame_mag(frame_mag <= eps) = 10*eps;
         
         power_dB(:,frameidx) = 20*log10(frame_mag);
     end

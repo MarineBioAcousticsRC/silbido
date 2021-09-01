@@ -52,6 +52,8 @@ classdef TonalTracker < handle
         
         filterBank;
         
+        peakMethod;
+        
         % Used when using a constantQ filter bank.
         centerFreqs;
         % Handle for ConstantQ class. Used only when 'constantQ' is
@@ -67,7 +69,7 @@ classdef TonalTracker < handle
             
             tt.Start_s = Start_s;
             
-            ActiveSet.setDebugging(false);
+            %ActiveSet.setDebugging(false);
 
             % Settable Thresholds --------------------------------------------------
             % Handle ParameterSet first as other things may override it.
@@ -79,6 +81,7 @@ classdef TonalTracker < handle
             % Other defaults ------------------------------------------------------
             tt.NoiseSub = 'median';          % what type of noise compensation
             tt.filterBank = 'linear';
+            tt.peakMethod = 'energy';
             
             k = 1;
             while k <= length(varargin)
@@ -125,6 +128,8 @@ classdef TonalTracker < handle
                         tt.noiseBoundaries = varargin{k+1}; k=k+2;
                     case 'FilterBank'
                         tt.filterBank = varargin{k+1}; k=k+2;
+                    case 'PeakMethod' %Peter CC
+                        tt.peakMethod =  varargin{k+1}; k=k+2;
                     otherwise
                         try
                             if isnumeric(varargin{k})
@@ -223,6 +228,11 @@ classdef TonalTracker < handle
                 tt.active_set = ActiveSet(cqBankBehavior);
             end
             
+            if(strcmp(tt.peakMethod,'DeepWhistle'))
+                tt.NoiseSub = 'none';
+                tt.removeTransients = false;
+            end
+            
             tt.active_set.setResolutionHz(tt.bin_Hz);
 
             % To compute the phase derivative, we should shift by a small
@@ -290,7 +300,14 @@ classdef TonalTracker < handle
             length_s = tt.StopBlock_s - tt.StartBlock_s;
             %fprintf('Processing noise block from %.10f to %.10f\n', tt.StartBlock_s, tt.StopBlock_s);
             
-            if (strcmp(tt.filterBank, 'linear'))
+            %Peter_Conant: Deep Whistle Model
+            if (strcmp(tt.peakMethod, 'DeepWhistle'))
+                length_s = round(length_s); %removed block padding
+                [tt.snr_power_dB, tt.Indices] = dtDeepWhistle(tt.handle, tt.header, tt.channel,...
+                    tt.StartBlock_s, length_s, [tt.thr.advance_ms, tt.thr.length_ms], ...
+                    [tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz]);
+                
+            elseif (strcmp(tt.filterBank, 'linear'))
                 [~, ~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
                     tt.handle, tt.header, tt.channel, ...
                     tt.StartBlock_s, length_s, [tt.Length_samples, tt.Advance_samples], ...

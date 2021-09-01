@@ -47,6 +47,11 @@ function [tonals, subgraphs] = dtTonalsTracking(Filename, Start_s, Stop_s, varar
 %       'linear' (default) or 'constantQ'. 'linear' provides a standard
 %       linear spacing of center frequencies. 'constantQ' provides a
 %       constant quality analysis with octave filter banks.
+%   'PeakMethod', The type of method used to detect whistles:
+%       'energy' (default) or 'DeepWhistle'. 'energy' provides annotations
+%       based on engery peaks detected across frames. 'DeepWhistle' uses a  
+%       pretrained neural network to identify whistles.
+%       
 
 stopwatch = tic;
 
