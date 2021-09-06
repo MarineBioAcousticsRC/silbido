@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<silbido>
+    <params>
+        
+        <!-- Time/frequency distribution (discrete Fourier transform) parameters -->
+        <advance_ms type="double">2</advance_ms>
+        <length_ms  type="double">8</length_ms>
+        
+        <!-- Frequency analysis criteria -->
+        <low_cutoff_Hz  type="double">5000</low_cutoff_Hz>
+        <high_cutoff_Hz  type="double">50000</high_cutoff_Hz>
+
+	<!-- Whistle Detection Method -->
+	<PeakMethod type="char">'DeepWhistle'</PeakMethod>
+        
+    </params>
+</silbido>

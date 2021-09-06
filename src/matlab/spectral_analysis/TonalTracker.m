@@ -128,7 +128,7 @@ classdef TonalTracker < handle
                         tt.noiseBoundaries = varargin{k+1}; k=k+2;
                     case 'FilterBank'
                         tt.filterBank = varargin{k+1}; k=k+2;
-                    case 'PeakMethod' %Peter CC
+                    case 'PeakMethod'
                         tt.peakMethod =  varargin{k+1}; k=k+2;
                     otherwise
                         try
@@ -228,11 +228,6 @@ classdef TonalTracker < handle
                 tt.active_set = ActiveSet(cqBankBehavior);
             end
             
-            if(strcmp(tt.peakMethod,'DeepWhistle'))
-                tt.NoiseSub = 'none';
-                tt.removeTransients = false;
-            end
-            
             tt.active_set.setResolutionHz(tt.bin_Hz);
 
             % To compute the phase derivative, we should shift by a small
@@ -245,12 +240,23 @@ classdef TonalTracker < handle
             tt.shift_samples_s = tt.shift_samples / tt.header.fs; 
 
             tt.block_pad_s = 1 / tt.thr.high_cutoff_Hz;
-            tt.block_padded_s = block_len_s + 2 * tt.block_pad_s;
+            
+            %We set args for peakMethod here to avoid errors with block_pad
+            if(strcmp(tt.peakMethod,'DeepWhistle'))
+                tt.NoiseSub = 'none';
+                tt.removeTransients = false;
+                tt.block_pad_s = 0;
+            else
+                tt.peakMethod = 'Energy';
+            end
+            
+            tt.block_padded_s = block_len_s + 2 * tt.block_pad_s;            
             tt.Stop_s = tt.Stop_s - tt.block_pad_s;
-
+            
             if tt.Start_s - tt.block_pad_s >= 0
                 tt.Start_s = tt.Start_s - tt.block_pad_s;
             end
+            
 
             % Keep track of how many peaks were detected in the previous frame
             % that was processed.  If the number of peaks suddenly rise by
@@ -302,9 +308,8 @@ classdef TonalTracker < handle
             
             %Peter_Conant: Deep Whistle Model
             if (strcmp(tt.peakMethod, 'DeepWhistle'))
-                length_s = round(length_s); %removed block padding
                 [tt.snr_power_dB, tt.Indices] = dtDeepWhistle(tt.handle, tt.header, tt.channel,...
-                    tt.StartBlock_s, length_s, [tt.thr.advance_ms, tt.thr.length_ms], ...
+                    tt.StartBlock_s, length_s, [tt.thr.length_ms, tt.thr.advance_ms], ...
                     [tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz]);
                 
             elseif (strcmp(tt.filterBank, 'linear'))

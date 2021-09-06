@@ -4,7 +4,7 @@ function [predicted_blk, Indices] = dtDeepWhistle(handle, header,...
 % information in samples ([Length, Advance]), and any optional
 % arguments, read in a data block and perform spectral processing.
 %
-% Returns a confidence map of detected whistles and framing information
+% Returns a confidence map of detected whistles and framing information.
 %   
 
 
@@ -21,7 +21,7 @@ max_clip = 6;
 min_clip = 0;
 
 %load Pu_Li's Pretrained Network
-net = load('C:\Users\Peter\Current Projects\DeepWhistle\5.ToSilbido\DAGnet361x1500.mat');
+net = load(strcat(pwd ,'\src\matlab\lib\DeepWhistle\DAGnet361x1500.mat'));
 
 start_frame = (blkstart_s * header.fs)+1;
 end_frame = floor((round(blkend_s) + 1 / freq_res - Framing(2)/1000) * header.fs); %added round to blkend_s because there was an extra .00004 during testing
