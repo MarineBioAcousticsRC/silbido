@@ -246,6 +246,7 @@ classdef TonalTracker < handle
                 tt.NoiseSub = 'none';
                 tt.removeTransients = false;
                 tt.block_pad_s = 0;
+                tt.thr.whistle_dB = .5;
             else
                 tt.peakMethod = 'Energy';
             end
@@ -309,7 +310,7 @@ classdef TonalTracker < handle
             %Peter_Conant: Deep Whistle Model
             if (strcmp(tt.peakMethod, 'DeepWhistle'))
                 [tt.snr_power_dB, tt.Indices] = dtDeepWhistle(tt.handle, tt.header, tt.channel,...
-                    tt.StartBlock_s, length_s, [tt.thr.length_ms, tt.thr.advance_ms], ...
+                    tt.StartBlock_s, length_s, tt.shift_samples, [tt.thr.length_ms, tt.thr.advance_ms], ...
                     [tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz]);
                 
             elseif (strcmp(tt.filterBank, 'linear'))
@@ -583,7 +584,7 @@ classdef TonalTracker < handle
         end
                         
         function processFile(tt)
-            tt.startBlock();
+            tt.startBlock();  % Get time-freq representation
             while (tt.hasMoreFrames())
                 tt.advanceFrame();
                 tt.processCurrentFrame();
