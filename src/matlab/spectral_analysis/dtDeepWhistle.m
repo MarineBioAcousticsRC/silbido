@@ -40,7 +40,9 @@ Signal = ioReadWav(handle, header, start_sample, end_sample, ...
     'Channels', channel, 'Normalize', 'unscaled');
 
 %Normalization
-Signal = Signal / 2^(8*(header.samp.byte- 2));
+if header.samp.byte > 2
+    Signal = Signal / 2^(8*(header.samp.byte- 2));
+end
 
 frames_per_s = header.fs/Advance_samples;
 
