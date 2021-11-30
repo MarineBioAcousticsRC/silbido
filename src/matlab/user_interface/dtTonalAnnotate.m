@@ -2179,7 +2179,7 @@ function [color, data] = get_plot_color(a_tonal, handles, data)
 
 % Determine colors
 1;
-handles.color_by
+handles.color_by;
 switch handles.color_by
     case 'color_by_tonal'
         color = data.AnnotationColormap(data.AnnotationColorNext, :);

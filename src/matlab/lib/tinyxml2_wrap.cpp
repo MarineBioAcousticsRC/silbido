@@ -380,10 +380,9 @@ mxArray *extractStruct(const XMLElement *element)
         const XMLElement *structElement = element->FirstChildElement();
         while(structElement)
         {
-            size_t idx=numel+1;
-            structElement->QueryUnsignedAttribute("idx",
-		      &static_cast<unsigned int>(idx));
-            numel=idx;
+            numel += 1;  // Increment index (start 
+            unsigned int idx = static_cast<unsigned int>(numel);
+            structElement->QueryUnsignedAttribute("idx", &idx);
             structElement = structElement->NextSiblingElement();
         }
         dims[0] = 1;        // 1 row
