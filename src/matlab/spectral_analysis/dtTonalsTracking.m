@@ -8,7 +8,9 @@ function [tonals, subgraphs] = dtTonalsTracking(Filename, Start_s, Stop_s, varar
 % Optional arguments in any order:
 %   'Framing', [Advance_ms, Length_ms] - frame advance and length in ms
 %       Defaults to 2 and 8 ms respectively
-%   'Threshold', N_dB - Energy threshold in dB
+%   'Threshold', N_dB - Energy threshold in dB. Energy PeakMethod
+%   'ConfidenceThresh', decimal - Confidence threshold between 0 and 1.
+%       DeepWhistle PeakMethod
 %   'ParameterSet', Name - Set of default parameters, currently
 %        supports 'odontocete' (default) and 'mysticete'
 %   'Interactive', bool - Wait for a keypress before processing the next
@@ -48,7 +50,7 @@ function [tonals, subgraphs] = dtTonalsTracking(Filename, Start_s, Stop_s, varar
 %       linear spacing of center frequencies. 'constantQ' provides a
 %       constant quality analysis with octave filter banks.
 %   'PeakMethod', The type of method used to detect whistles:
-%       'energy' (default) or 'DeepWhistle'. 'energy' provides annotations
+%       'Energy' (default) or 'DeepWhistle'. 'Energy' provides annotations
 %       based on engery peaks detected across frames. 'DeepWhistle' uses a  
 %       pretrained neural network to identify whistles.
 %       

@@ -81,7 +81,7 @@ classdef TonalTracker < handle
             % Other defaults ------------------------------------------------------
             tt.NoiseSub = 'median';          % what type of noise compensation
             tt.filterBank = 'linear';
-            tt.peakMethod = 'energy';
+            tt.peakMethod = 'DeepWhistle';
             
             k = 1;
             while k <= length(varargin)
@@ -97,6 +97,8 @@ classdef TonalTracker < handle
                         k=k+2;
                     case 'Threshold'
                         tt.thr.whistle_dB = varargin{k+1}; k=k+2;
+                    case 'ConfidenceThresh'
+                        tt.thr.confidence_thresh = varargin{k+1}; k=k+2;
                     case 'ParameterSet'
                         k=k+2;  % already handled
                     case 'ActiveSet_s'
@@ -242,13 +244,13 @@ classdef TonalTracker < handle
             tt.block_pad_s = 1 / tt.thr.high_cutoff_Hz;
             
             %We set args for peakMethod here to avoid errors with block_pad
-            if(strcmp(tt.peakMethod,'DeepWhistle'))
+            if(strcmp(tt.peakMethod,'Energy'))
+                tt.thr.peak_thresh = tt.thr.whistle_dB;
+            else %defualt DeepWhistle
                 tt.NoiseSub = 'none';
                 tt.removeTransients = false;
                 tt.block_pad_s = 0;
-                tt.thr.whistle_dB = .5;
-            else
-                tt.peakMethod = 'Energy';
+                tt.thr.peak_thresh = tt.thr.confidence_thresh;
             end
             
             tt.block_padded_s = block_len_s + 2 * tt.block_pad_s;            
@@ -370,7 +372,7 @@ classdef TonalTracker < handle
 
            % Remove peaks that don't meet SNR criterion
            % BT: Problem w/ CQ lies here - whistle peaks are being removed.
-           peaks(tt.smoothed_dB(peaks) < tt.thr.whistle_dB) = [];  
+           peaks(tt.smoothed_dB(peaks) < tt.thr.peak_thresh) = [];  
 
            peaks = consolidate_peaks(peaks, tt.smoothed_dB, 2);
 
@@ -434,7 +436,7 @@ classdef TonalTracker < handle
             d2_thresh = -2;  % was -1 earlier, not sure which is better
 
             % Remove peaks that don't meet SNR & 2nd deriv criteria
-            peaks = find(tt.smoothed_dB > tt.thr.whistle_dB & ...
+            peaks = find(tt.smoothed_dB > tt.thr.peak_thresh & ...
                 d2 < d2_thresh);
             % When peaks are too close, pick the best one
             % find peaks that are close to one another
