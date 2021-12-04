@@ -106,7 +106,7 @@ end
 
 % Retrieve the data for this block
 Signal = ioReadWav(handle, header, start, stop, ...
-    'Units', 's', 'Channels', channel);
+    'Units', 's', 'Channels', channel, 'Normalize', 'unscaled');
 
 if (false)
     % Click deemphasis as described in

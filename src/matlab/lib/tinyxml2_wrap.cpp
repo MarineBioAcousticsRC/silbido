@@ -46,7 +46,7 @@ struct ExportOptions
 
 const char * getFormatingString(mxClassID classID, const char *className, const char *singleFloatingFormat, const char *doubleFloatingFormat);
 mxClassID getClassByName(const char *name);
-int * getDimensions(const char *sizeAttribute, int *ndim, unsigned *numel);
+mwSize * getDimensions(const char *sizeAttribute, mwSize *ndim, size_t *numel);
 XMLNode * add(XMLNode *parent, const mxArray *data_MA, const char *nodeName, ExportOptions *options);
 
 template<typename T>
@@ -56,18 +56,20 @@ XMLNode * add(XMLNode *parent, T const * const data, const mxArray *data_MA, mxC
     XMLElement *element = doc->NewElement(nodeName);
     parent->InsertEndChild( element );
     
-    unsigned   ndim = mxGetNumberOfDimensions(data_MA);
-    const int *dims = mxGetDimensions(data_MA);
-    unsigned  numel = mxGetNumberOfElements(data_MA);
+    size_t   ndim = mxGetNumberOfDimensions(data_MA);
+    const mwSize *dims = mxGetDimensions(data_MA);
+    size_t  numel = mxGetNumberOfElements(data_MA);
     if(numel!=1 && options->storeSize)
     {
         char *sizeStr = (char *)mxMalloc((ndim*10 + 1)*sizeof(char));  // max number of characters for unsigned equals 9 + space
         int pos = 0;
         for(unsigned n=0; n<ndim-1; n++)
         {
-            pos += sprintf(sizeStr+pos, "%u ", dims[n]);           
+            pos += sprintf(sizeStr+pos, "%u ",
+			   static_cast<unsigned int>(dims[n]));           
         }
-        sprintf(sizeStr+pos, "%u", dims[ndim-1]);   // last size without a space  
+        sprintf(sizeStr+pos, "%u",
+		static_cast<unsigned int>(dims[ndim-1]));   // last size without a space  
         element->SetAttribute("size", sizeStr);
         mxFree(sizeStr);
     }
@@ -106,9 +108,9 @@ XMLNode * addStruct(XMLNode *parent, const mxArray *aStruct, const char *nodeNam
     XMLElement *element = doc->NewElement(nodeName);
     parent->InsertEndChild( element );
 
-    unsigned   ndim = mxGetNumberOfDimensions(aStruct);
-    const int *dims = mxGetDimensions(aStruct);
-    unsigned  numel = mxGetNumberOfElements(aStruct);
+    size_t   ndim = mxGetNumberOfDimensions(aStruct);
+    const mwSize *dims = mxGetDimensions(aStruct);
+    size_t  numel = mxGetNumberOfElements(aStruct);
     bool writeIndexes = false;
     
     if(numel!=1 && options->storeSize)
@@ -117,9 +119,12 @@ XMLNode * addStruct(XMLNode *parent, const mxArray *aStruct, const char *nodeNam
         int pos = 0;
         for(unsigned n=0; n<ndim-1; n++)
         {
-            pos += sprintf(sizeStr+pos, "%u ", dims[n]);           
+	  pos += sprintf(sizeStr+pos, "%u ",
+			 static_cast<unsigned int>(dims[n]));           
         }
-        sprintf(sizeStr+pos, "%u", dims[ndim-1]);   // last size without a space  
+	// last size without a space  
+        sprintf(sizeStr+pos, "%u",
+		static_cast<unsigned int>(dims[ndim-1]));   
         element->SetAttribute("size", sizeStr);
         writeIndexes = true;
         mxFree(sizeStr);
@@ -172,9 +177,9 @@ XMLNode * addCell(XMLNode *parent, const mxArray *aCell, const char *nodeName, E
     XMLElement *element = doc->NewElement(nodeName);
     parent->InsertEndChild( element );
      
-    unsigned   ndim = mxGetNumberOfDimensions(aCell);
-    const int *dims = mxGetDimensions(aCell);
-    unsigned  numel = mxGetNumberOfElements(aCell);
+    mwSize   ndim = mxGetNumberOfDimensions(aCell);
+    const mwSize *dims = mxGetDimensions(aCell);
+    size_t  numel = mxGetNumberOfElements(aCell);
     bool writeIndexes = false;   
     if(numel!=1 && options->storeSize)
     {
@@ -182,9 +187,11 @@ XMLNode * addCell(XMLNode *parent, const mxArray *aCell, const char *nodeName, E
         int pos = 0;
         for(unsigned n=0; n<ndim-1; n++)
         {
-            pos += sprintf(sizeStr+pos, "%u ", dims[n]);           
+	  pos += sprintf(sizeStr+pos, "%u ", 
+			 static_cast<unsigned int>(dims[n]));           
         }
-        sprintf(sizeStr+pos, "%u", dims[ndim-1]);   // last size without a space  
+        sprintf(sizeStr+pos, "%u",
+		static_cast<unsigned int>(dims[ndim-1]));   // last size without a space  
         element->SetAttribute("size", sizeStr);
         writeIndexes = true;
         mxFree(sizeStr);
@@ -230,18 +237,20 @@ XMLNode *addChar(XMLNode *parent, char const * const data, const mxArray * aStri
     XMLElement *element = doc->NewElement(nodeName);
     parent->InsertEndChild( element );
 
-    unsigned   ndim = mxGetNumberOfDimensions(aString);
-    const int *dims = mxGetDimensions(aString);
-    unsigned  numel = mxGetNumberOfElements(aString); 
+    mwSize   ndim = mxGetNumberOfDimensions(aString);
+    const mwSize *dims = mxGetDimensions(aString);
+    size_t  numel = mxGetNumberOfElements(aString); 
     if(options->storeSize)
     {
         char *sizeStr = (char *)mxMalloc((ndim*10 + 1)*sizeof(char));  // max number of characters for unsigned equals 9 + space
         int pos = 0;
         for(unsigned n=0; n<ndim-1; n++)
         {
-            pos += sprintf(sizeStr+pos, "%u ", dims[n]);           
+	  pos += sprintf(sizeStr+pos, "%u ", 
+static_cast<unsigned int>(dims[n]));           
         }
-        sprintf(sizeStr+pos, "%u", dims[ndim-1]);   // last size without a space  
+        sprintf(sizeStr+pos, "%u",
+		static_cast<unsigned int>(dims[ndim-1]));   // last size without a space  
         element->SetAttribute("size", sizeStr);
         mxFree(sizeStr);
     }
@@ -331,10 +340,10 @@ mxArray *extractChar(const XMLElement *element)
 {
     mxArray *aString = mxCreateString(element->GetText());
 
-    int ndim=0;
-    unsigned numel=0;
+    mwSize ndim=0;
+    size_t numel=0;
     const char *sizeAttribute=element->Attribute( "size" );
-    int *dims = getDimensions(sizeAttribute, &ndim, &numel);
+    mwSize *dims = getDimensions(sizeAttribute, &ndim, &numel);
     
     if(sizeAttribute)
     {
@@ -359,10 +368,10 @@ mxArray *extractChar(const XMLElement *element)
 
 mxArray *extractStruct(const XMLElement *element)
 {
-    int ndim=0;
-    unsigned numel=0;
+    mwSize ndim=0;
+    size_t numel=0;
     const char *sizeAttribute=element->Attribute( "size" );
-    int *dims = getDimensions(sizeAttribute, &ndim, &numel);
+    size_t *dims = getDimensions(sizeAttribute, &ndim, &numel);
 
     if(!sizeAttribute)
     {
@@ -371,9 +380,9 @@ mxArray *extractStruct(const XMLElement *element)
         const XMLElement *structElement = element->FirstChildElement();
         while(structElement)
         {
-            unsigned idx=numel+1;
-            structElement->QueryUnsignedAttribute("idx", &idx);            
-            numel=idx;
+            numel += 1;  // Increment index (start 
+            unsigned int idx = static_cast<unsigned int>(numel);
+            structElement->QueryUnsignedAttribute("idx", &idx);
             structElement = structElement->NextSiblingElement();
         }
         dims[0] = 1;        // 1 row
@@ -450,10 +459,10 @@ mxArray *extractStruct(const XMLElement *element)
 // cells
 mxArray *extractCell(const XMLElement *element)
 {
-    int ndim=0;
-    unsigned numel=0;
+    mwSize ndim=0;
+    size_t numel=0;
     const char *sizeAttribute=element->Attribute( "size" );
-    int *dims = getDimensions(sizeAttribute, &ndim, &numel);
+    size_t *dims = getDimensions(sizeAttribute, &ndim, &numel);
 
     // count cells
     {
@@ -515,10 +524,10 @@ mxArray *extract(const XMLElement *element, mxClassID classID)
 {
     //const char *fmtStr = getFormatingString(classID, "[extract, no className given]");
     
-    int ndim=0;
-    unsigned numel=0;
+    mwSize ndim=0;
+    size_t numel=0;
     const char *sizeAttribute=element->Attribute( "size" );
-    int *dims = getDimensions(sizeAttribute, &ndim, &numel);
+    size_t *dims = getDimensions(sizeAttribute, &ndim, &numel);
     
     mxArray *theMatrix = mxCreateNumericArray(ndim, dims, classID, mxREAL);
     mxFree(dims);
@@ -788,7 +797,7 @@ const char * getFormatingString(mxClassID classID, const char *className, const 
 }
 
 
-int * getDimensions(const char *sizeAttribute, int *ndim, unsigned *numel)
+mwSize * getDimensions(const char *sizeAttribute, mwSize *ndim, size_t *numel)
 /*
  * Get number of dimensions and size per dimension from "size" attribute in element.
  *
@@ -807,7 +816,7 @@ int * getDimensions(const char *sizeAttribute, int *ndim, unsigned *numel)
 {
     *ndim = 0;
     *numel = 1;
-    int *dimSize = (int *)mxMalloc(2*sizeof(int));
+    mwSize *dimSize = static_cast<mwSize *>(mxMalloc(2*sizeof(mwSize)));
     if(sizeAttribute)
     {
         // read size of each dimension until it fails
@@ -819,7 +828,7 @@ int * getDimensions(const char *sizeAttribute, int *ndim, unsigned *numel)
         {
             size_ptr += pos;
             (*ndim)++;            
-            dimSize = (int *)mxRealloc(dimSize, *ndim * sizeof(int));
+            dimSize = static_cast<mwSize *>(mxRealloc(dimSize, *ndim * sizeof(mwSize)));
             dimSize[*ndim-1] = size;
             *numel *= size;
         }

@@ -52,6 +52,8 @@ classdef TonalTracker < handle
         
         filterBank;
         
+        peakMethod;
+        
         % Used when using a constantQ filter bank.
         centerFreqs;
         % Handle for ConstantQ class. Used only when 'constantQ' is
@@ -67,7 +69,7 @@ classdef TonalTracker < handle
             
             tt.Start_s = Start_s;
             
-            ActiveSet.setDebugging(false);
+            %ActiveSet.setDebugging(false);
 
             % Settable Thresholds --------------------------------------------------
             % Handle ParameterSet first as other things may override it.
@@ -79,6 +81,7 @@ classdef TonalTracker < handle
             % Other defaults ------------------------------------------------------
             tt.NoiseSub = 'median';          % what type of noise compensation
             tt.filterBank = 'linear';
+            tt.peakMethod = 'DeepWhistle';
             
             k = 1;
             while k <= length(varargin)
@@ -94,6 +97,8 @@ classdef TonalTracker < handle
                         k=k+2;
                     case 'Threshold'
                         tt.thr.whistle_dB = varargin{k+1}; k=k+2;
+                    case 'ConfidenceThresh'
+                        tt.thr.confidence_thresh = varargin{k+1}; k=k+2;
                     case 'ParameterSet'
                         k=k+2;  % already handled
                     case 'ActiveSet_s'
@@ -125,6 +130,8 @@ classdef TonalTracker < handle
                         tt.noiseBoundaries = varargin{k+1}; k=k+2;
                     case 'FilterBank'
                         tt.filterBank = varargin{k+1}; k=k+2;
+                    case 'PeakMethod'
+                        tt.peakMethod =  varargin{k+1}; k=k+2;
                     otherwise
                         try
                             if isnumeric(varargin{k})
@@ -235,12 +242,24 @@ classdef TonalTracker < handle
             tt.shift_samples_s = tt.shift_samples / tt.header.fs; 
 
             tt.block_pad_s = 1 / tt.thr.high_cutoff_Hz;
-            tt.block_padded_s = block_len_s + 2 * tt.block_pad_s;
+            
+            %We set args for peakMethod here to avoid errors with block_pad
+            if(strcmp(tt.peakMethod,'Energy'))
+                tt.thr.peak_thresh = tt.thr.whistle_dB;
+            else %defualt DeepWhistle
+                tt.NoiseSub = 'none';
+                tt.removeTransients = false;
+                tt.block_pad_s = 0;
+                tt.thr.peak_thresh = tt.thr.confidence_thresh;
+            end
+            
+            tt.block_padded_s = block_len_s + 2 * tt.block_pad_s;            
             tt.Stop_s = tt.Stop_s - tt.block_pad_s;
-
+            
             if tt.Start_s - tt.block_pad_s >= 0
                 tt.Start_s = tt.Start_s - tt.block_pad_s;
             end
+            
 
             % Keep track of how many peaks were detected in the previous frame
             % that was processed.  If the number of peaks suddenly rise by
@@ -290,7 +309,13 @@ classdef TonalTracker < handle
             length_s = tt.StopBlock_s - tt.StartBlock_s;
             %fprintf('Processing noise block from %.10f to %.10f\n', tt.StartBlock_s, tt.StopBlock_s);
             
-            if (strcmp(tt.filterBank, 'linear'))
+            %Peter_Conant: Deep Whistle Model
+            if (strcmp(tt.peakMethod, 'DeepWhistle'))
+                [tt.snr_power_dB, tt.Indices] = dtDeepWhistle(tt.handle, tt.header, tt.channel,...
+                    tt.StartBlock_s, length_s, tt.shift_samples, [tt.thr.length_ms, tt.thr.advance_ms], ...
+                    [tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz]);
+                
+            elseif (strcmp(tt.filterBank, 'linear'))
                 [~, ~, tt.snr_power_dB, tt.Indices, ~, ~] = dtProcessBlock(...
                     tt.handle, tt.header, tt.channel, ...
                     tt.StartBlock_s, length_s, [tt.Length_samples, tt.Advance_samples], ...
@@ -347,7 +372,7 @@ classdef TonalTracker < handle
 
            % Remove peaks that don't meet SNR criterion
            % BT: Problem w/ CQ lies here - whistle peaks are being removed.
-           peaks(tt.smoothed_dB(peaks) < tt.thr.whistle_dB) = [];  
+           peaks(tt.smoothed_dB(peaks) < tt.thr.peak_thresh) = [];  
 
            peaks = consolidate_peaks(peaks, tt.smoothed_dB, 2);
 
@@ -411,7 +436,7 @@ classdef TonalTracker < handle
             d2_thresh = -2;  % was -1 earlier, not sure which is better
 
             % Remove peaks that don't meet SNR & 2nd deriv criteria
-            peaks = find(tt.smoothed_dB > tt.thr.whistle_dB & ...
+            peaks = find(tt.smoothed_dB > tt.thr.peak_thresh & ...
                 d2 < d2_thresh);
             % When peaks are too close, pick the best one
             % find peaks that are close to one another
@@ -561,7 +586,7 @@ classdef TonalTracker < handle
         end
                         
         function processFile(tt)
-            tt.startBlock();
+            tt.startBlock();  % Get time-freq representation
             while (tt.hasMoreFrames())
                 tt.advanceFrame();
                 tt.processCurrentFrame();
