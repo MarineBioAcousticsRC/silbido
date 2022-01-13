@@ -11,7 +11,7 @@ function params = dtParseParameterSet(varargin)
 
 
 ParameterSetIdx = [];
-ParameterSet = 'DeepWhistle.xml';  % default
+ParameterSet = 'odontocete_deep.xml';  % default
 
 if length(varargin) > 0
     % Find last index of ParameterSet string

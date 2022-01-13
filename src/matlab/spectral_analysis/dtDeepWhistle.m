@@ -14,11 +14,15 @@ function [predicted_blk, Indices] = dtDeepWhistle(handle, header,...
 % We load the neural network only once
 persistent net
 if isempty(net)
-    % Determine where silbido is installed
-    rootdir = fileparts(which('silbido_init'));
-    % Determine net path
-    netfname = fullfile(rootdir, ...
-        'src/matlab/lib/DeepWhistle/DAGnet361x1500.mat');
+    % Determine where neural net library is stored
+    libdir = fullfile(fileparts(which('silbido_init')), ...
+        'src/matlab/lib/DeepWhistle');
+    % Neural network name
+    netname = 'Li_et_al_2020_deep_silbido_361x1500';
+    
+    onnx = fullfile(libdir, [netname, '.onnx']);
+    dag = fullfile(libdir, [netname, '.mat']);
+    netfname = fullfile(libdir, 'DAGnet361x1500.mat');
     net = load(netfname);
 end
 

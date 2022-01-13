@@ -7,12 +7,13 @@
         <length_ms  type="double">8</length_ms>
         
         <!-- Frequency analysis criteria -->
-        <maxgap_Hz  type="double">1000</maxgap_Hz>  <!-- maximum gap between predicition and peak -->
+        <maxgap_Hz  type="double">1000</maxgap_Hz>  <!-- maximum gap between prediction and peak -->
         <low_cutoff_Hz  type="double">5000</low_cutoff_Hz>
         <high_cutoff_Hz  type="double">50000</high_cutoff_Hz>
 
-        <!-- Energy criteria -->
-        <confidence_thresh  type="double">.5</confidence_thresh>  <!-- Whistle SNR criterion -->
+        <!-- Peak detection method and threshold -->
+        <peak_method type="char">'DeepWhistle'</peak_method>
+        <confidence_thresh  type="double">.5</confidence_thresh>  <!-- Whistle peak confidence criterion -->
 
         <!-- Duration criteria -->
         <minlen_ms  type="double">150</minlen_ms> <!-- Minimum whistle duration -->
@@ -33,10 +34,6 @@
         <predict_lookback_s type="double">.025</predict_lookback_s>
         <!-- Use preceding N s for polynomial fit when disambiguating a graph -->
         <disambiguate_s type="double">.3</disambiguate_s>   
-        
-
-	    <!-- Whistle Detection Method -->
-	    <PeakMethod type="char">'DeepWhistle'</PeakMethod>
         
     </params>
 </silbido>

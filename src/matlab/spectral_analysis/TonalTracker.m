@@ -52,7 +52,7 @@ classdef TonalTracker < handle
         
         filterBank;
         
-        peakMethod;
+        peak_method;
         
         % Used when using a constantQ filter bank.
         centerFreqs;
@@ -81,7 +81,7 @@ classdef TonalTracker < handle
             % Other defaults ------------------------------------------------------
             tt.NoiseSub = 'median';          % what type of noise compensation
             tt.filterBank = 'linear';
-            tt.peakMethod = 'DeepWhistle';
+            tt.peak_method = 'DeepWhistle';
             
             k = 1;
             while k <= length(varargin)
@@ -131,7 +131,7 @@ classdef TonalTracker < handle
                     case 'FilterBank'
                         tt.filterBank = varargin{k+1}; k=k+2;
                     case 'PeakMethod'
-                        tt.peakMethod =  varargin{k+1}; k=k+2;
+                        tt.peak_method =  varargin{k+1}; k=k+2;
                     otherwise
                         try
                             if isnumeric(varargin{k})
@@ -244,7 +244,7 @@ classdef TonalTracker < handle
             tt.block_pad_s = 1 / tt.thr.high_cutoff_Hz;
             
             %We set args for peakMethod here to avoid errors with block_pad
-            if(strcmp(tt.peakMethod,'Energy'))
+            if(strcmp(tt.peak_method,'Energy'))
                 tt.thr.peak_thresh = tt.thr.whistle_dB;
             else %defualt DeepWhistle
                 tt.NoiseSub = 'none';
@@ -310,7 +310,7 @@ classdef TonalTracker < handle
             %fprintf('Processing noise block from %.10f to %.10f\n', tt.StartBlock_s, tt.StopBlock_s);
             
             %Peter_Conant: Deep Whistle Model
-            if (strcmp(tt.peakMethod, 'DeepWhistle'))
+            if (strcmp(tt.peak_method, 'DeepWhistle'))
                 [tt.snr_power_dB, tt.Indices] = dtDeepWhistle(tt.handle, tt.header, tt.channel,...
                     tt.StartBlock_s, length_s, tt.shift_samples, [tt.thr.length_ms, tt.thr.advance_ms], ...
                     [tt.thr.low_cutoff_Hz, tt.thr.high_cutoff_Hz]);

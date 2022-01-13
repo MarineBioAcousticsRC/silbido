@@ -43,9 +43,12 @@ function varargout = dtTonalAnnotate(varargin)
 %       linear spacing of center frequencies. 'constantQ' provides a
 %       constant quality analysis with octave filter banks.
 %   'PeakMethod', The method used to detect whistles:
-%       'energy' (default)- detects whistles based on peaks in energy.
-%       'DeepWhistle' - uses a pretrained convolutional network to detect
-%           whistle shapes. 
+%       'energy' - detects whistles based on energy peaks in
+%           time X frequency data
+%       'DeepWhistle' (default) - uses a pretrained convolutional network 
+%           to detect whistle energy inte time X frequency data
+%           using contextual information. 
+
 
 % Note:
 % This function requires dtTonalAnnotate.fig to be present and uses
@@ -1831,8 +1834,7 @@ if strcmp(action, 'Overwrite')
     [handles, data] = clear_RenderedAnnotations(handles, data);
 end
 data.annotations = ...
-    dtTonalsTracking(data.Filename, 0, Inf, 'ParameterSet', data.thr,...
-    'PeakMethod', data.PeakMethod);
+    dtTonalsTracking(data.Filename, 0, Inf, 'ParameterSet', data.thr);
 set(handles.Annotation, 'UserData', data);
 
 [handles, data] = plot_tonals(handles, data);
