@@ -1,6 +1,8 @@
 function [predicted_blk, Indices] = dtDeepWhistle(handle, header,...
     channel, blkstart_s, blklength_s, Shift, Framing, Range)
-%DTPREDICPLOT Given a start time and length in seconds, framing
+% [predicted_blk, Indices] = dtDeepWhistle(handle, header,...
+%    channel, blkstart_s, blklength_s, Shift, Framing, Range)
+% Given a start time and length in seconds, framing
 % information in samples ([Length, Advance]), and any optional
 % arguments, read in a data block and perform spectral processing.
 %
@@ -20,10 +22,13 @@ if isempty(net)
     % Neural network name
     netname = 'Li_et_al_2020_deep_silbido_361x1500';
     
+    % The ONNX network is not needed, it has already been converted
+    % to a DAG network. The oriignal network was called this:
     onnx = fullfile(libdir, [netname, '.onnx']);
-    dag = fullfile(libdir, [netname, '.mat']);
-    netfname = fullfile(libdir, 'DAGnet361x1500.mat');
-    net = load(netfname);
+    % The DAG network was produced by using the function onnx2dag that
+    % is in the libdir
+    dagfname = fullfile(libdir, [netname, '.mat']);
+    net = load(dagfname);
 end
 
 Length_s = Framing(1)/1000;
@@ -92,27 +97,35 @@ normalized_blk(normalized_blk>max_clip)=max_clip;
 normalized_blk(normalized_blk<min_clip)=min_clip;
 normalized_blk = (normalized_blk - min_clip) / (max_clip - min_clip);
 
-inputsize = net.net1500.Layers(1).InputSize;
+try
+    inputsize = net.network.Layers(1).InputSize;
+catch exception
+    if strcmp(exception.identifier, 'MATLAB:structRefFromNonStruct')
+        error('silbido:missing_onyx_importer', ...
+            ['The ONYX neural network importer has not been installed.\n', ...
+            'Type importONNXNetwork and click on the link to install']);
+    end
+end
 
 blksize = size(normalized_blk);
 
 %If the spectrogram size is different from the inputsize of our model,
 %we create a new input layer to match the spectrogram
 if ~all(blksize == inputsize(1:2))
-    connections = net.net1500.Connections;
+    connections = net.network.Connections;
     layer = imageInputLayer([blksize,1], 'Name', 'Input_input.1',...
         'Normalization', 'none', 'NormalizationDimension', 'auto');
-    layers = net.net1500.Layers;
+    layers = net.network.Layers;
     layers(1) = layer;
     lgraph = layerGraph(layers);
     %layerGraph does not connect all layers
     %LayerConnect reconnects any missed layers
-    net.net1500 = LayerConnect(lgraph,connections);
+    net.network = LayerConnect(lgraph,connections);
 end
 
 
 
-predicted_blk = predict(net.net1500,normalized_blk);
+predicted_blk = predict(net.network,normalized_blk);
 
 % relative to file rather than block
 Indices.timeidx = Indices.timeidx + blkstart_s;
