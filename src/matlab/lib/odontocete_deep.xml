@@ -13,7 +13,8 @@
 
         <!-- Peak detection method and threshold -->
         <peak_method type="char">'DeepWhistle'</peak_method>
-        <confidence_thresh  type="double">.5</confidence_thresh>  <!-- Whistle peak confidence criterion -->
+        <confidence_thresh  type="double">.5</confidence_thresh>  <!-- DeepWhistle peak confidence criterion -->
+        <energy_thresh type="double">10</energy_thresh>  <!--Graph Search Energy peak energy criterion-->
 
         <!-- Duration criteria -->
         <minlen_ms  type="double">150</minlen_ms> <!-- Minimum whistle duration -->

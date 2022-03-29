@@ -91,12 +91,12 @@ classdef TonalTracker < handle
                             error('Silbido:Framing', ...
                                 '%s must be [Advance_ms, Length_ms]', varargin{k});
                         else
-                            tt.thr.advance_ms = varargin{k+1}(1);
+                            tt.thr.thradvance_ms = varargin{k+1}(1);
                             tt.thr.length_ms = varargin{k+1}(2);
                         end
                         k=k+2;
-                    case 'Threshold'
-                        tt.thr.whistle_dB = varargin{k+1}; k=k+2;
+                    case 'EnergyThresh'
+                        tt.thr.energy_thresh = varargin{k+1}; k=k+2;
                     case 'ConfidenceThresh'
                         tt.thr.confidence_thresh = varargin{k+1}; k=k+2;
                     case 'ParameterSet'
@@ -245,7 +245,7 @@ classdef TonalTracker < handle
             
             %We set args for peakMethod here to avoid errors with block_pad
             if(strcmp(tt.peak_method,'Energy'))
-                tt.thr.peak_thresh = tt.thr.whistle_dB;
+                tt.thr.peak_thresh = tt.thr.energy_thresh;
             else %defualt DeepWhistle
                 tt.NoiseSub = 'none';
                 tt.removeTransients = false;

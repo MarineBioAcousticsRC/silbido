@@ -8,7 +8,7 @@ function [tonals, subgraphs] = dtTonalsTracking(Filename, Start_s, Stop_s, varar
 % Optional arguments in any order:
 %   'Framing', [Advance_ms, Length_ms] - frame advance and length in ms
 %       Defaults to 2 and 8 ms respectively
-%   'Threshold', N_dB - Energy threshold in dB. Energy PeakMethod
+%   'EnergyThreshold', N_dB - Energy threshold in dB. Energy PeakMethod
 %   'ConfidenceThresh', decimal - Confidence threshold between 0 and 1.
 %       DeepWhistle PeakMethod
 %   'ParameterSet', Name - Set of default parameters, currently

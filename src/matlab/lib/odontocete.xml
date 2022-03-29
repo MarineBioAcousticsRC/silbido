@@ -12,7 +12,7 @@
         <high_cutoff_Hz  type="double">50000</high_cutoff_Hz>
         
         <!-- Peak detection method and threshold -->
-        <peak_method>Energy</peak_method>
+        <peak_method type="char">'Energy'</peak_method>
         <whistle_dB  type="double">10</whistle_dB>  <!-- Whistle SNR criterion -->
         
         <!-- Duration criteria -->
@@ -35,9 +35,6 @@
         <predict_lookback_s type="double">.025</predict_lookback_s>
         <!-- Use preceding N s for polynomial fit when disambiguating a graph -->
         <disambiguate_s type="double">.3</disambiguate_s>   
-
-        <!-- Whistle Detection Method -->
-	    <PeakMethod type="char">'Energy'</PeakMethod>
         
         
     </params>

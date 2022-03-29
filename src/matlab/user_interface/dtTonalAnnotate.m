@@ -43,11 +43,15 @@ function varargout = dtTonalAnnotate(varargin)
 %       linear spacing of center frequencies. 'constantQ' provides a
 %       constant quality analysis with octave filter banks.
 %   'PeakMethod', The method used to detect whistles:
-%       'energy' - detects whistles based on energy peaks in
+%       'Energy' - detects whistles based on energy peaks in
 %           time X frequency data
 %       'DeepWhistle' (default) - uses a pretrained convolutional network 
 %           to detect whistle energy inte time X frequency data
 %           using contextual information. 
+%   'Threshold', Threshold for detecting peaks. For 'Energy' Threshold is
+%       measured in dB (Deafualt 10). For 'DeepWhislte' it is a 
+%       confidence scale between 0 and 1 (defualt .5).
+%
 
 
 % Note:
@@ -240,8 +244,12 @@ while k <= length(varargin)
             data.FilterBank = varargin{k+1};
             k=k+2;
         case 'PeakMethod'
-            data.PeakMethod = varargin{k+1};
+            data.thr.peak_method = varargin{k+1};
             k=k+2;
+        case 'EnergyThreshold'
+            data.thr.whistle_dB = varargin{k+1}; k=k+2;
+        case 'ConfidenceThresh'
+            data.thr.confidence_thresh = varargin{k+1}; k=k+2;
         otherwise
             try
                 if isnumeric(varargin{k})
