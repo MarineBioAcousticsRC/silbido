@@ -59,7 +59,7 @@ function varargout = dtTonalAnnotate(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 10-Dec-2018 15:25:13
+% Last Modified by GUIDE v2.5 20-Apr-2022 19:11:34
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -367,6 +367,14 @@ children = setdiff(findobj(handles.Annotation, 'BusyAction', 'queue'), ...
     handles.Annotation);
 set(children, 'BusyAction', 'cancel')
 
+% Labeling data
+data.species_call_map = dtGetLabelOptions();
+species_names = (data.species_call_map.keys)';
+handles.species_label.String = species_names;
+handles.species_label.Value = 1;
+call_info = data.species_call_map(species_names{1});
+handles.call_label.String = call_info.calls;
+handles.call_label.Value = call_info.selected;
 SaveDataInFigure(handles, data);  % save user/figure data before plot
 % Plot data -- callback will plot
 if data.RemoveTransients
@@ -3296,8 +3304,15 @@ function species_label_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: contents = cellstr(get(hObject,'String')) returns species_label contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from species_label
+% update call label set
+species = handles.species_label.String{handles.species_label.Value};
+data = get(handles.Annotation, 'UserData');
+old_call = handles.call_label.Value;
+% Set the appropriate calls for the species and the last call
+% the user selected
+call_info = data.species_call_map(species);
+handles.call_label.String = call_info.calls;
+handles.call_label.Value = call_info.selected;
 
 
 % --- Executes during object creation, after setting all properties.
@@ -3319,9 +3334,17 @@ function call_label_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: contents = cellstr(get(hObject,'String')) returns call_label contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from call_label
-
+% Update the last call picked for this species
+new_call = hObject.Value;
+% Determine current species
+species = handles.species_label.String{handles.species_label.Value};
+% Store this call value so that we can come back to it if a user
+% switches species
+data = get(handles.Annotation, 'UserData');
+map = data.species_call_map(species);
+map.selected = new_call;
+data.species_call_map(species) = map;
+SaveDataInFigure(handles, data);
 
 % --- Executes during object creation, after setting all properties.
 function call_label_CreateFcn(hObject, eventdata, handles)
@@ -3379,3 +3402,54 @@ if changed
 end
 
 
+
+
+% --- Executes on button press in Playback.
+function Playback_Callback(hObject, eventdata, handles)
+% hObject    handle to Playback (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+data = handles.Annotation.UserData;
+start_s = str2num(handles.Start_s.String);
+duration_s = str2num(handles.ViewLength_s.String);
+stop_s = start_s + duration_s;
+speed = str2num(handles.PlaybackSpeed.String);
+filename = data.Filename;
+% determine channel to process as per Triton rules
+channel = channelmap(data.hdr, filename);
+hdr = data.hdr;
+% Retrieve the data for what's on the screen
+handle = fopen(filename, 'rb', 'l');
+signal = ioReadWav(handle, hdr, start_s, stop_s, ...
+    'Units', 's', 'Channels', channel, 'Normalize', 'unscaled');
+fclose(handle);
+if abs(speed - 1) < .01
+    Fs = data.hdr.fs;
+else
+    Fs = round(data.hdr.fs * speed);
+end
+soundsc(signal,Fs, hdr.nBits);
+1;
+
+
+
+function PlaybackSpeed_Callback(hObject, eventdata, handles)
+% hObject    handle to PlaybackSpeed (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of PlaybackSpeed as text
+%        str2double(get(hObject,'String')) returns contents of PlaybackSpeed as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function PlaybackSpeed_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to PlaybackSpeed (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
