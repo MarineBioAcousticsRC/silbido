@@ -30,7 +30,7 @@ function [peak] = consolidate_peaks(peak, smoothed_dB, min_bin_gap)
         % recalculate diffs and find if there are more peaks that are too
         % close
         peak_dist = diff(peak);
-        too_close_idx = find(peak_dist < 2);
+        too_close_idx = find(peak_dist < min_bin_gap);
     end
 end
 
