@@ -48,10 +48,11 @@ function varargout = dtTonalAnnotate(varargin)
 %       'DeepWhistle' (default) - uses a pretrained convolutional network 
 %           to detect whistle energy inte time X frequency data
 %           using contextual information. 
-%   'Threshold', Threshold for detecting peaks. For 'Energy' Threshold is
-%       measured in dB (Deafualt 10). For 'DeepWhislte' it is a 
-%       confidence scale between 0 and 1 (defualt .5).
-%
+%   'Threshold', Threshold for detecting peaks. The interpretation depends
+%       on the PeakMethod selected:
+%           'Energy' - SNR threshold is measured in dB (default 10). 
+%           'DeepWhistle' - Confidence threshold [0, 1] (default .5).
+
 
 
 % Note:
@@ -59,7 +60,7 @@ function varargout = dtTonalAnnotate(varargin)
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 20-Apr-2022 19:11:34
+% Last Modified by GUIDE v2.5 18-Nov-2022 13:12:59
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -3453,3 +3454,18 @@ function PlaybackSpeed_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --------------------------------------------------------------------
+function spectrogram_colormap_Callback(hObject, eventdata, handles)
+% hObject    handle to spectrogram_colormap (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+data = get(handles.Annotation, 'UserData');
+% Invert colormap for spectrogram
+data.SpecgramColormap = flipud(data.SpecgramColormap);
+guidata(hObject, handles);
+[handles, data] = spectrogram(handles, data);
+SaveDataInFigure(handles, data);
