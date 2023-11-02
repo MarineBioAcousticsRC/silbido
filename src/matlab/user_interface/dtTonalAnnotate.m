@@ -2125,7 +2125,9 @@ end
 
 % Images will painted on top of any preview or selected points, 
 % Reorder, placing images at end of list
-axisChildren = get(axisH, 'Children');
+% "fliplr" is to ensure that the earlier block is rendered above
+% the latter: this hides visual artifacts of the snr averaging filter
+axisChildren = fliplr(get(axisH, 'Children')')';
 axisIndcs = 1:length(axisChildren);
 % Locate the images in the list of children
 imageIndcs = zeros(length(handles.image), 1);

@@ -7,9 +7,15 @@ function blocks = dtDefaultBlockBoundaries(...
     blocks = zeros(0,2);
     
     %frames_per_s = Fs/advance_samples;
-    
+    first = true;
     while(StopBlock_s < (file_len_s - Advance_s - shift_samples_s))
-        StopBlock_s = min(StartBlock_s + block_len_s + 2 * block_pad_s, file_len_s);
+        if (first)
+            StopBlock_s = min(StartBlock_s + block_len_s + block_pad_s, file_len_s);
+            first = false;
+        else
+            StopBlock_s = min(StartBlock_s + block_len_s + 2 * block_pad_s, file_len_s);
+        end
+
         
         %fprintf('Processing raw block from %.10f to %.10f\n', StartBlock_s, StopBlock_s);
         blocks = vertcat(blocks, [StartBlock_s, StopBlock_s]);
@@ -21,7 +27,7 @@ function blocks = dtDefaultBlockBoundaries(...
         
         %StartBlock_s = Indices.timeidx(end) + Advance_s - shift_samples_s;
         %StartBlock_s = StopBlock_s - shift_samples_s;
-        StartBlock_s = StartBlock_s + block_len_s - shift_samples_s;
+        StartBlock_s = max(StopBlock_s - shift_samples_s - 2 * block_pad_s, 0);
     end
 end
 
