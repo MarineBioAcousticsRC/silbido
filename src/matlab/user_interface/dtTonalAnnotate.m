@@ -1796,7 +1796,11 @@ data.undo = struct('before', {}, 'after', {});
 newstart_s = start_in_range(data.Start_s, handles, data);
 data.Start_s = newstart_s;
 set(handles.Start_s, 'String', num2str(newstart_s));
-[handles, data] = spectrogram(handles, data)
+[handles, data] = spectrogram(handles, data);
+[fdir, fname] = fileparts(data.Filename);
+set(handles.Annotation, 'Name', ...
+    sprintf('%s%s Annotation [%s]', data.FigureTitle, fname, fdir));
+
 SaveDataInFigure(handles, data);
 
 
@@ -2384,12 +2388,21 @@ f = a_tonal.get_freq();
 indices = unique(round(linspace(1, length(t), order)));
 
 handles.Points = [];
-for idx=1:order
-    handles.Points = [handles.Points, ...
-        create_point(t(indices(idx)), f(indices(idx))/data.scale, ...
-        handles, data.point_color)];
-    if false %~ ishandle(handles.Points(idx))
-        error('Silbido:InternalError', 'Unable to create a point during edit selection');
+if length(t) < order
+    % User has very few points, just use them
+    for idx=1:length(t)
+        handles.Points = [handles.Points, ...
+            create_point(t(idx), f(idx)/data.scale, handles, data.point_color)];
+    end
+else
+    % sample points within the curve
+    for idx=1:order
+        handles.Points = [handles.Points, ...
+            create_point(t(indices(idx)), f(indices(idx))/data.scale, ...
+            handles, data.point_color)];
+        if false %~ ishandle(handles.Points(idx))
+            error('Silbido:InternalError', 'Unable to create a point during edit selection');
+        end
     end
 end
 set(handles.image, 'ButtonDownFcn', @edit_newpoint);
