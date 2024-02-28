@@ -53,7 +53,13 @@ function varargout = dtTonalAnnotate(varargin)
 %           'Energy' - SNR threshold is measured in dB (default 10). 
 %           'DeepWhistle' - Confidence threshold [0, 1] (default .5).
 
-
+% Convert any and all string arguments to character arguments to allow
+% the user to call with strings
+for i = 1:length(varargin)
+    if isstring(varargin{i})
+        varargin{i} = char(varargin{i});
+    end
+end
 
 % Note:
 % This function requires dtTonalAnnotate.fig to be present and uses
@@ -2123,7 +2129,9 @@ end
 
 % Images will painted on top of any preview or selected points, 
 % Reorder, placing images at end of list
-axisChildren = get(axisH, 'Children');
+% "fliplr" is to ensure that the earlier block is rendered above
+% the latter: this hides visual artifacts of the snr averaging filter
+axisChildren = fliplr(get(axisH, 'Children')')';
 axisIndcs = 1:length(axisChildren);
 % Locate the images in the list of children
 imageIndcs = zeros(length(handles.image), 1);

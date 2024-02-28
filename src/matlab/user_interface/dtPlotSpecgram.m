@@ -212,7 +212,16 @@ end
 shift_samples = 0;
 shift_samples_s = shift_samples / header.fs;
 
-block_pad_s = 1 / thr.high_cutoff_Hz;
+% Padding the number of samples/frame allows for the full block length
+% to be generated with full FFT frames.
+% Because of how SNR is calculated, we have n_bad_snr_frames poorly
+% rendered pixels at the end of a block.
+% TODO: There likely does not need to be any padding at the beginning, but
+% the padding currently is equal on both sides. Maybe remove pre-padding
+% elsewhere in code.
+n_bad_snr_frames = 1;
+block_pad_frames = Length_samples + n_bad_snr_frames;
+block_pad_s = block_pad_frames * Length_s/Length_samples; % 1 / thr.high_cutoff_Hz;
 
 % Determine what padding is needed.
 % padding will be added to each side of the current
@@ -302,8 +311,9 @@ while (block_idx <= size(blocks,1))
     %fprintf('Block(%.4f - %.4f) = TimeIdx(%.4f - %.4f)\n', blkstart_s, blkend_s, Indices_blk.timeidx(1), Indices_blk.timeidx(end));
     
     % Plot spectrogram with image().
+    snr_dB_blk = snr_dB_blk(:, 1:floor((Indices_blk.FrameLastComplete - n_bad_snr_frames)));
     if (strcmp(FilterBank,'linear'))
-        ImageH(hidx) = image(Indices_blk.timeidx, frequencyAxis, snr_dB_blk, 'Parent', AxisH);
+        ImageH(hidx) = image(Indices_blk.timeidx(1:floor((Indices_blk.FrameLastComplete - n_bad_snr_frames))), frequencyAxis, snr_dB_blk, 'Parent', AxisH);
     elseif (strcmp(FilterBank,'constantQ'))
         ImageH(hidx) = image(Indices_blk.timeidx, log10(frequencyAxis), snr_dB_blk, 'Parent', AxisH);
     end
@@ -333,7 +343,8 @@ while (block_idx <= size(blocks,1))
 end
 
 fclose(handle);
-set(AxisH, 'XLim', [Start_s, Stop_s]);
+% Padding was added to Stop_s earlier and now must be deducted
+set(AxisH, 'XLim', [Start_s, Stop_s - block_pad_s]);
 set(AxisH, 'YDir', 'normal');
 if strcmp(FilterBank, 'linear')
     set(AxisH, 'YLim', [frequencyAxis(1), frequencyAxis(end)]);
