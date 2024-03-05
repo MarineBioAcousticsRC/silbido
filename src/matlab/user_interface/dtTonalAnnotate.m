@@ -143,6 +143,7 @@ data.FilterBank = 'linear';
 
 Filename = '';
 data.RelativeFilePath = '';
+data.FigureTitle = '';
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -324,10 +325,7 @@ data.Start_s = 0;
 data.Stop_s = data.hdr.Chunks{data.hdr.dataChunk}.nSamples/data.hdr.fs;
 data.RemoveTransients = false;
 
-
 data.operation = [];
-
-data.FigureTitle = '';
 
 data.ms_per_s = 1000;
 data.thr.advance_s = data.thr.advance_ms / data.ms_per_s;
@@ -720,7 +718,21 @@ for idx=1:selectedN+tonalFromPoints
         merged = merged.merge(newtonal);
     end
 end
-data.annotations.add(merged);
+% Determine where in list to insert 
+
+start_time = merged.getFirst().time;
+iter = data.annotations.iterator();
+found = false;
+idx = 0;  % keep count of position
+while (~ found && iter.hasNext())
+    t = iter.next();
+    if start_time < t.getFirst().time 
+        found = true;
+    else
+        idx = idx + 1;
+    end
+end
+data.annotations.add(idx, merged);
 change.after = {merged};
 
 if ~isempty(handles.Selected)
