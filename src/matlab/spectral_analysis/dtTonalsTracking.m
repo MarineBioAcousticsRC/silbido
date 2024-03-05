@@ -55,6 +55,13 @@ function [tonals, subgraphs] = dtTonalsTracking(Filename, Start_s, Stop_s, varar
 %       pretrained neural network to identify whistles.
 %       
 
+
+% See if silbido has been initialized
+import tonals.*;
+if exist('tonals.tonal') == 0
+    silbido_init();
+end
+
 stopwatch = tic;
 
 
