@@ -66,7 +66,7 @@ end
 % callbacks extensively.
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Last Modified by GUIDE v2.5 18-Nov-2022 13:12:59
+% Last Modified by GUIDE v2.5 01-Mar-2024 15:11:13
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 0;
@@ -3477,3 +3477,41 @@ data.SpecgramColormap = flipud(data.SpecgramColormap);
 guidata(hObject, handles);
 [handles, data] = spectrogram(handles, data);
 SaveDataInFigure(handles, data);
+
+
+
+
+% --- Executes during object creation, after setting all properties.
+function SelectAnnotationN_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to SelectAnnotationN (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes to select a specific tonal
+function SelectAnnotationN_Callback(hObject, eventdata, handles)
+% hObject    handle to SelectAnnotationN (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of SelectAnnotationN as text
+%        str2double(get(hObject,'String')) returns contents of SelectAnnotationN as a double
+
+if get(handles.Annotation, 'UserData').annotations.size() == 0
+    set(hObject, 'String', 0);
+else
+    mintonal = max(1, get(handles.MoveToAnnotationN, 'Min'));
+    maxtonal = get(handles.MoveToAnnotationN, 'Max');
+    
+    value = min(maxtonal, max(mintonal, str2double(get(hObject, 'String'))));
+    set(handles.MoveToAnnotationN, 'Value', value)
+    MoveToAnnotationN_Callback(hObject, eventdata, handles);
+
+    set(hObject, 'String', value);
+end
