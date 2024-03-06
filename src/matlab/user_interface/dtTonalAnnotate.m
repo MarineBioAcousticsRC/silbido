@@ -125,8 +125,11 @@ data.SpecgramColormap = bone();
 data.AnnotationColorN = 20;
 data.AnnotationColorNext = 1;
 data.AnnotationColormap = hsv(data.AnnotationColorN);
-data.AnnotationColormap = ...
-    data.AnnotationColormap(randperm(data.AnnotationColorN), :);
+data.AnnotationColorIdxIncrement = 9;
+% I do not know why this randomization was applied
+% I have removed it as of 3/5/2024 to make the colors deterministic
+%data.AnnotationColormap = ...
+%    data.AnnotationColormap(randperm(data.AnnotationColorN), :);
 data.LineWidth = 2;
 data.LineStyle = '-';
 data.LineSelectedStyle = ':';
@@ -374,10 +377,10 @@ set(children, 'BusyAction', 'cancel')
 
 % Labeling data
 data.species_call_map = dtGetLabelOptions();
-species_names = (data.species_call_map.keys)';
-handles.species_label.String = species_names;
+data.species_names = (data.species_call_map.keys)';
+handles.species_label.String = data.species_names;
 handles.species_label.Value = 1;
-call_info = data.species_call_map(species_names{1});
+call_info = data.species_call_map(data.species_names{1});
 handles.call_label.String = call_info.calls;
 handles.call_label.Value = call_info.selected;
 SaveDataInFigure(handles, data);  % save user/figure data before plot
@@ -1297,6 +1300,25 @@ if find(handles.Rendered == hObject, 1, 'first')
             guidata(figureH, handles);
     end
     tonal_selected_count(handles);  % update info about selections
+    
+    % update label dropdown to display the selected tonal's species & call
+    % species
+    species = char(get(handles.Selected(1), 'UserData').getSpecies());
+    if ~isempty(species) && (numel(handles.Selected) == 1)
+        sf = strfind((data.species_names), species);
+        species_idx = find(~cellfun('isempty', sf));
+        
+        set(handles.species_label, 'Value', species_idx)
+        
+        % call
+        call = char(get(handles.Selected(1), 'UserData').getCall());
+        new_calls = data.species_call_map(species).calls;
+        set(handles.call_label, 'String', new_calls);
+        
+        sf = strfind(new_calls, call);
+        call_idx = find(~cellfun('isempty', sf));
+        set(handles.call_label, 'Value', call_idx)
+    end
 end
         
 function new_s = start_in_range(start_s, handles, data)
@@ -2234,7 +2256,7 @@ switch handles.color_by
         % Reserve the first color for when there are no labels
         species = a_tonal.getSpecies();
         speciesN = size(handles.species_label.String, 1);
-        coloridx = find(strcmp(species, handles.species_label.String));
+        coloridx = data.AnnotationColorIdxIncrement * find(strcmp(species, handles.species_label.String));
         if isempty(coloridx)
             coloridx = 1;  % No label
         else
@@ -2250,7 +2272,7 @@ switch handles.color_by
         callN = size(handles.call_label.String, 1);
         coloridx = find(strcmp(call, handles.call_label.String));
         if isempty(coloridx)
-            coloridx = 1  % No label
+            coloridx = 1;  % No label
         else
             coloridx = coloridx + 1;
         end
@@ -2870,6 +2892,7 @@ else
         current = annotationsN;
         set(handles.MoveToAnnotationN, 'Max', annotationsN);
         set(handles.MoveToAnnotationN, 'Value', current);
+        set(handles.SelectAnnotationN, 'String', round(current));
     end
     if annotationsN == 1
         % Special case, slider does not show in min/max are the same
@@ -2886,6 +2909,7 @@ else
     set(handles.GotoAnnotationPrev, 'Enable', 'on');
     set(handles.GotoAnnotationLabel, 'String', ...
         sprintf('%d/%d', current, annotations.size()));    
+    set(handles.SelectAnnotationN, 'String', round(current));
 end
 
 
@@ -3538,5 +3562,4 @@ else
     set(handles.MoveToAnnotationN, 'Value', value)
     MoveToAnnotationN_Callback(hObject, eventdata, handles);
 
-    set(hObject, 'String', value);
 end
