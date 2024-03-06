@@ -1303,25 +1303,25 @@ if find(handles.Rendered == hObject, 1, 'first')
     
     % update label dropdown to display the selected tonal's species & call
     % species
-    species = char(get(handles.Selected(1), 'UserData').getSpecies());
-    if ~isempty(species) && (numel(handles.Selected) == 1)
+    species = char(get(handles.Selected(end), 'UserData').getSpecies());
+    if ~isempty(species) && handles.label_asign_mode.Value == 0
         sf = strfind((data.species_names), species);
         species_idx = find(~cellfun('isempty', sf));
 
         if isempty(species_idx)
-            fprintf("Encountered unknown species (%s).\n", species);
+            fprintf("Encountered unknown species (%s). Consider adding it to species_calls.json\n", species);
         else
             set(handles.species_label, 'Value', species_idx);
             
             % call
-            call = char(get(handles.Selected(1), 'UserData').getCall());
+            call = char(get(handles.Selected(end), 'UserData').getCall());
             new_calls = data.species_call_map(species).calls;
             set(handles.call_label, 'String', new_calls);
             
             sf = strfind(new_calls, call);
             call_idx = find(~cellfun('isempty', sf));
             if isempty(call_idx)
-                fprintf("Encountered unknown call type (%s) for species %s.\n", call, species);
+                fprintf("Encountered unknown call type (%s) for species %s. Consider adding it to species_calls.json\n", call, species);
             else
                 set(handles.call_label, 'Value', call_idx);
             end
