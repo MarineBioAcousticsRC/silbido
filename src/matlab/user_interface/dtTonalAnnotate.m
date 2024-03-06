@@ -1307,17 +1307,25 @@ if find(handles.Rendered == hObject, 1, 'first')
     if ~isempty(species) && (numel(handles.Selected) == 1)
         sf = strfind((data.species_names), species);
         species_idx = find(~cellfun('isempty', sf));
-        
-        set(handles.species_label, 'Value', species_idx)
-        
-        % call
-        call = char(get(handles.Selected(1), 'UserData').getCall());
-        new_calls = data.species_call_map(species).calls;
-        set(handles.call_label, 'String', new_calls);
-        
-        sf = strfind(new_calls, call);
-        call_idx = find(~cellfun('isempty', sf));
-        set(handles.call_label, 'Value', call_idx)
+
+        if isempty(species_idx)
+            fprintf("Encountered unknown species (%s).\n", species);
+        else
+            set(handles.species_label, 'Value', species_idx);
+            
+            % call
+            call = char(get(handles.Selected(1), 'UserData').getCall());
+            new_calls = data.species_call_map(species).calls;
+            set(handles.call_label, 'String', new_calls);
+            
+            sf = strfind(new_calls, call);
+            call_idx = find(~cellfun('isempty', sf));
+            if isempty(call_idx)
+                fprintf("Encountered unknown call type (%s) for species %s.\n", call, species);
+            else
+                set(handles.call_label, 'Value', call_idx);
+            end
+        end
     end
 end
         
