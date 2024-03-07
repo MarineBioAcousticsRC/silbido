@@ -1304,7 +1304,7 @@ if find(handles.Rendered == hObject, 1, 'first')
     % update label dropdown to display the selected tonal's species & call
     % species
     species = char(get(handles.Selected(end), 'UserData').getSpecies());
-    if ~isempty(species) && handles.label_asign_mode.Value == 0
+    if ~isempty(species)
         sf = strfind((data.species_names), species);
         species_idx = find(~cellfun('isempty', sf));
 
@@ -3459,7 +3459,6 @@ if changed
         a_tonal = get(handles.Rendered(idx), 'UserData');
         [color, data] = get_plot_color(a_tonal, handles, data);
         fprintf('%d species %s call %s color\n', idx, a_tonal.getSpecies(), a_tonal.getCall());
-        color
         set(handles.Rendered(idx), 'Color', color);
     end    
     % Store user's choice.
