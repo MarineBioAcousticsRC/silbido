@@ -597,6 +597,22 @@ if isempty(handles.Editing)
     return
 end
 new_tonal = getTonalFromPoints(handles, data);
+
+% See if user wants calls assigned to a label
+if handles.label_asign_mode.Value > 0
+    % Tonal is to be assigned to a species/call
+    sidx = get(handles.species_label, 'Value');
+    species_list = get(handles.species_label', 'String');
+    if ~ strcmp(species_list{sidx}, 'unknown')
+        new_tonal.setSpecies(species_list{sidx});
+    end
+    cidx = get(handles.call_label, 'Value');
+    call_list = get(handles.call_label', 'String');
+    if ~ strcmp(call_list{cidx}, 'unknown')
+        new_tonal.setCall(call_list{cidx});
+    end
+end
+
 if ~ isempty(new_tonal)
     % Update undo record
     change.before = {get(handles.Editing, 'UserData')};
