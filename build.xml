@@ -40,7 +40,7 @@
     <mkdir dir="${java.build}"/>
     <mkdir dir="${java.build.classes}"/>
     
-    <javac srcdir="${java.src}" destdir="${java.build.classes}" includeantruntime="false" target="1.6" source="1.6">
+    <javac srcdir="${java.src}" destdir="${java.build.classes}" includeantruntime="false" target="1.8" source="1.8">
       <classpath refid="silbido-classpath"/>
     </javac>
    <copy todir="${build.jar}">
