@@ -6,5 +6,5 @@ function handle = ioOpenWav(filename)
 % Do not modify the following line, maintained by CVS
 % $Id% %Exp$
 
-% Open as little endian binary file
+% Open as little-endian binary file (WAV/RIFF standard)
 handle = fopen(filename, 'rb', 'l');
