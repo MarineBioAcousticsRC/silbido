@@ -1,3 +1,5 @@
+.idea/*
+src/java/.idea/*
 *.class
 *.jar
 #.*
