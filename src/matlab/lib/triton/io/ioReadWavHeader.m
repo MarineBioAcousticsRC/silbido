@@ -36,9 +36,20 @@ if f_handle == -1
 end
 
 Riff = ioReadRIFFCkHdr(f_handle);
-if ~ strcmp(Riff.ID, 'RIFF')
+% Check for Microsoft RIFF or recommended 64 bit extension
+% thereof (Intl Telecom Union: ITU-R BS.2088)
+riff32 = strcmp(Riff.ID, "RIFF");
+riff64 = strcmp(Riff.ID, "RF64");
+
+% This value in 32 bit fields indicates we override
+% with 64 bit values and is only used for RF64
+use64bit = 0xffffffff;
+
+chunk_map = containers.Map('KeyType', 'char', 'ValueType', 'double');
+
+if ~ riff32 && ~ riff64
     fclose(f_handle);
-    error('io:%s is not a RIFF wave file', Filename);
+    error('io:%s is not a RIFF or RIFF-64 wave file', Filename);
 else
     % Verify that we have a WAVE file.
     [RiffType, bytes] = fread(f_handle, 4, 'char');
@@ -62,8 +73,51 @@ else
                 Chunk.Info = ioReadRIFFCk_fmt(f_handle, Chunk);
                 hdr.fmtChunk = length(Chunks)+1;  % Note chunk idx
 
+            case 'ds64'
+                % datasize 64 bit
+                % this chunk must follow the format chunk for RF64
+                if ~ riff64
+                    error("64-bit data size (ds64) chunk present, but not a RF64 file");
+                else
+                    % ioReadRIFFCkHdr will have already read chunk size
+                    % RF64 block size
+                    Chunk.riffSize = fread(f_handle, 1, 'uint64');
+                    % Data chunk size
+                    Chunk.DataSize = fread(f_handle, 1, 'uint64');
+
+                    Chunk.sampleCount = fread(f_handle, 1, 'uint64');
+                    % Number of entries in table
+                    Chunk.tableLength = fread(f_handle, 1, 'uint32');
+
+                    if Chunk.tableLength ~= 0
+                        error('RIFF64 ds64 tables not yet supported')
+                    end
+
+                    % Replace RIFF Data/Header size if needed
+                    % We don't replace other chunks until later as
+                    % they may not yet be read.
+
+
+
+                    if Riff.DataSize == use64bit
+                        delta = Riff.ChunkSize - Riff.DataSize;
+                        Riff.DataSize = Chunk.DataSize;
+                        Riff.ChunkSize = Chunk.DataSize + delta;
+                    end
+
+                end
+                1;
+
+
             case 'data'
                 hdr.dataChunk = length(Chunks)+1;  % Note chunk idx
+
+                % Replace Data/Header size if needed
+                if Chunk.DataSize == use64bit
+                    delta = Chunk.ChunkSize - Chunk.DataSize;
+                    Chunk.DataSize = Chunks{chunk_map('ds64')}.DataSize;
+                    Chunk.ChunkSize = Chunk.DataSize + delta;
+                end
 
             case 'harp'
                 %error('harp not yet supported');
@@ -83,10 +137,15 @@ else
                     error('io:fmt chunk must come before harp chunk');
                 end
 
+                % 
+
             otherwise
                 Chunk.info = [];    % no meta information to store
         end
-        Chunks{end+1} = Chunk;        % store new chunk
+
+        % Store new chunk and remember its position
+        Chunks{end+1} = Chunk;        
+        chunk_map(Chunk.ID) = length(Chunks);  
 
         fseek(f_handle, Chunk.StartByte + Chunk.ChunkSize, 'bof');
         if 0    % debug
