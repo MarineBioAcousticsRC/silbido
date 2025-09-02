@@ -3462,7 +3462,9 @@ if abs(speed - 1) < .01
 else
     Fs = round(data.hdr.fs * speed);
 end
-soundsc(signal,Fs, hdr.nBits);
+% Scale to N bit audio
+bits = min(24, hdr.nBits);  % Most systems won't support 32 bit
+soundsc(signal,Fs, bits);
 1;
 
 
