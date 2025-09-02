@@ -142,8 +142,6 @@ end
 
 
 header = ioReadWavHeader(File);
-% TODO: REMOVE.
-% header.fs = header.fs * 2;
 handle = fopen(File, 'rb', 'l');
 % Select channel as per Triton
 channel = channelmap(header, File);
