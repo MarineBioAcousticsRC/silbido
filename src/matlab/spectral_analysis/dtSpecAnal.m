@@ -57,6 +57,7 @@ if (strcmp(FilterBank, 'linear'))
         %frame_mag(frame_mag <= eps) = 10*eps;
         
         power_dB(:,frameidx) = 20*log10(frame_mag);
+        1;
     end
     
     numBins = rangeBinsN;
@@ -109,7 +110,17 @@ if ~ iscell(NoiseComp)
     NoiseComp = {NoiseComp};
 end
 
-snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp{:}, ~clickP);
+% For many of the noise compensation algorithms, noise estimation
+% ignores bins with click energy as these will boost the noise level
+% considerably and we are no longer measuring background noise. When
+% animals are clicking heavily, it is possible that all bins have
+% click energy and we cannot do this.
+if all(clickP)
+    noiseP = ones(size(clickP));
+else
+    noiseP = ~clickP;
+end
+snr_dB = dtSpectrogramNoiseComp(power_dB, NoiseComp{:}, noiseP);
 
 % Linear addition as the frequency of each constantQ "bin" increases.
 if (strcmp(FilterBank, 'constantQ'))
